@@ -677,6 +677,150 @@ async def check_session_overlap(org_id: str, agent_id: str, start_time: datetime
     
     return False
 
+def calculate_business_hours_due_date(start_time: datetime, minutes_to_add: int, business_hours: dict) -> datetime:
+    """Calculate due date adding minutes only during business hours"""
+    if not business_hours:
+        # No business hours configured, add minutes directly
+        return start_time + timedelta(minutes=minutes_to_add)
+    
+    from datetime import time as dt_time
+    import pytz
+    
+    # Parse business hours
+    tz_str = business_hours.get('timezone', 'UTC')
+    try:
+        tz = pytz.timezone(tz_str)
+    except:
+        tz = pytz.UTC
+    
+    work_days = business_hours.get('work_days', [1, 2, 3, 4, 5])
+    start_time_str = business_hours.get('start_time', '09:00')
+    end_time_str = business_hours.get('end_time', '17:00')
+    
+    # Parse work hours
+    work_start_hour, work_start_min = map(int, start_time_str.split(':'))
+    work_end_hour, work_end_min = map(int, end_time_str.split(':'))
+    
+    work_start = dt_time(work_start_hour, work_start_min)
+    work_end = dt_time(work_end_hour, work_end_min)
+    
+    # Calculate minutes per work day
+    work_minutes_per_day = (work_end_hour * 60 + work_end_min) - (work_start_hour * 60 + work_start_min)
+    
+    # Ensure start_time is timezone-aware
+    if start_time.tzinfo is None:
+        start_time = pytz.UTC.localize(start_time)
+    
+    # Convert to business timezone
+    current = start_time.astimezone(tz)
+    remaining_minutes = minutes_to_add
+    
+    while remaining_minutes > 0:
+        # Check if current day is a work day
+        weekday = current.isoweekday()  # Monday=1, Sunday=7
+        
+        if weekday in work_days:
+            current_time = current.time()
+            
+            # If before work hours, jump to work start
+            if current_time < work_start:
+                current = current.replace(hour=work_start_hour, minute=work_start_min, second=0, microsecond=0)
+                current_time = current.time()
+            
+            # If after work hours, jump to next day's work start
+            if current_time >= work_end:
+                current = current + timedelta(days=1)
+                current = current.replace(hour=work_start_hour, minute=work_start_min, second=0, microsecond=0)
+                continue
+            
+            # Calculate minutes until end of work day
+            current_minutes = current_time.hour * 60 + current_time.minute
+            work_end_minutes = work_end_hour * 60 + work_end_min
+            minutes_until_end = work_end_minutes - current_minutes
+            
+            if remaining_minutes <= minutes_until_end:
+                # Can finish within this work day
+                current = current + timedelta(minutes=remaining_minutes)
+                remaining_minutes = 0
+            else:
+                # Use up this work day and continue to next
+                remaining_minutes -= minutes_until_end
+                current = current + timedelta(days=1)
+                current = current.replace(hour=work_start_hour, minute=work_start_min, second=0, microsecond=0)
+        else:
+            # Non-work day, skip to next day
+            current = current + timedelta(days=1)
+            current = current.replace(hour=work_start_hour, minute=work_start_min, second=0, microsecond=0)
+    
+    # Convert back to UTC
+    return current.astimezone(pytz.UTC)
+
+async def apply_sla_to_ticket(ticket_id: str, org_id: str, priority: str, created_at: datetime):
+    """Apply SLA policy to ticket based on priority"""
+    # Find SLA policy for this priority
+    sla_policy = await db.sla_policies.find_one({
+        "organization_id": org_id,
+        "priority": priority
+    }, {"_id": 0})
+    
+    if not sla_policy:
+        # No SLA policy for this priority
+        return
+    
+    # Get business hours
+    business_hours = await db.business_hours.find_one({"organization_id": org_id}, {"_id": 0})
+    
+    # Calculate due dates
+    response_due = calculate_business_hours_due_date(
+        created_at,
+        sla_policy['response_time_minutes'],
+        business_hours
+    )
+    
+    resolution_due = calculate_business_hours_due_date(
+        created_at,
+        sla_policy['resolution_time_minutes'],
+        business_hours
+    )
+    
+    # Update ticket with SLA info
+    await db.tickets.update_one(
+        {"id": ticket_id},
+        {"$set": {
+            "sla_policy_id": sla_policy['id'],
+            "response_due_at": response_due.isoformat(),
+            "resolution_due_at": resolution_due.isoformat()
+        }}
+    )
+
+async def check_sla_breach(ticket: dict):
+    """Check if SLA has been breached and update flags"""
+    now = datetime.now(timezone.utc)
+    
+    updates = {}
+    
+    # Check response SLA
+    if ticket.get('response_due_at') and not ticket.get('first_response_at'):
+        response_due = ticket['response_due_at']
+        if isinstance(response_due, str):
+            response_due = datetime.fromisoformat(response_due)
+        
+        if now > response_due and not ticket.get('sla_breached_response'):
+            updates['sla_breached_response'] = True
+    
+    # Check resolution SLA
+    if ticket.get('resolution_due_at') and ticket.get('status') not in ['resolved', 'closed']:
+        resolution_due = ticket['resolution_due_at']
+        if isinstance(resolution_due, str):
+            resolution_due = datetime.fromisoformat(resolution_due)
+        
+        if now > resolution_due and not ticket.get('sla_breached_resolution'):
+            updates['sla_breached_resolution'] = True
+    
+    # Update if needed
+    if updates:
+        await db.tickets.update_one({"id": ticket['id']}, {"$set": updates})
+
 async def send_email_async(recipient: str, subject: str, html: str):
     """Send email asynchronously"""
     if not resend.api_key or resend.api_key == 're_placeholder_add_your_key':
