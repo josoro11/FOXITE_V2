@@ -578,6 +578,61 @@ async def get_next_ticket_number(org_id: str) -> int:
         return highest['ticket_number'] + 1
     return 1  # First ticket
 
+def calculate_duration(start_time: datetime, end_time: datetime) -> int:
+    """Calculate duration in minutes between start and end time"""
+    if not start_time or not end_time:
+        return 0
+    
+    # Ensure both are datetime objects
+    if isinstance(start_time, str):
+        start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+    if isinstance(end_time, str):
+        end_time = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+    
+    delta = end_time - start_time
+    return max(0, int(delta.total_seconds() / 60))
+
+async def check_session_overlap(org_id: str, agent_id: str, start_time: datetime, end_time: Optional[datetime] = None, exclude_session_id: Optional[str] = None) -> bool:
+    """Check if a session overlaps with existing sessions for an agent"""
+    # Build query to find overlapping sessions
+    query = {
+        "organization_id": org_id,
+        "agent_id": agent_id
+    }
+    
+    if exclude_session_id:
+        query["id"] = {"$ne": exclude_session_id}
+    
+    # Get all sessions for this agent
+    existing_sessions = await db.sessions.find(query, {"_id": 0}).to_list(1000)
+    
+    for session in existing_sessions:
+        session_start = session.get('start_time')
+        session_end = session.get('end_time')
+        
+        # Convert to datetime if strings
+        if isinstance(session_start, str):
+            session_start = datetime.fromisoformat(session_start.replace('Z', '+00:00'))
+        if session_end and isinstance(session_end, str):
+            session_end = datetime.fromisoformat(session_end.replace('Z', '+00:00'))
+        
+        # If existing session has no end time (active), check if new session starts during it
+        if not session_end:
+            if start_time >= session_start:
+                return True  # Overlap with active session
+        else:
+            # Check for overlap
+            if end_time:
+                # Both sessions have end times
+                if (start_time < session_end and end_time > session_start):
+                    return True
+            else:
+                # New session has no end time (being started)
+                if start_time < session_end:
+                    return True
+    
+    return False
+
 async def send_email_async(recipient: str, subject: str, html: str):
     """Send email asynchronously"""
     if not resend.api_key or resend.api_key == 're_placeholder_add_your_key':
