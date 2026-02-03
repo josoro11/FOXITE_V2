@@ -1323,7 +1323,7 @@ async def list_end_users(current_user: dict = Depends(get_current_user)):
 
 # ==================== TICKET ROUTES ====================
 
-@api_router.post("/tickets", response_model=Ticket)
+@api_router.post("/tickets")
 async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
@@ -1352,7 +1352,18 @@ async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(
     await db.tickets.insert_one(doc)
     await log_audit(org_id, current_user['id'], "CREATE", "ticket", ticket.id)
     
-    return ticket
+    # Apply SLA policy based on priority
+    await apply_sla_to_ticket(ticket.id, org_id, ticket.priority, ticket.created_at)
+    
+    # Get updated ticket with SLA info
+    updated_ticket = await db.tickets.find_one({"id": ticket.id}, {"_id": 0})
+    
+    # Convert datetime strings back to objects for response
+    for field in ['created_at', 'updated_at', 'response_due_at', 'resolution_due_at', 'first_response_at']:
+        if updated_ticket.get(field) and isinstance(updated_ticket[field], str):
+            updated_ticket[field] = datetime.fromisoformat(updated_ticket[field])
+    
+    return updated_ticket
 
 @api_router.get("/tickets", response_model=List[Ticket])
 async def list_tickets(current_user: dict = Depends(get_current_user)):
