@@ -218,6 +218,14 @@ class Language(str):
     EN = "en"
     ES = "es"
 
+class CommentType(str):
+    INTERNAL_NOTE = "internal_note"  # Staff-only
+    PUBLIC_REPLY = "public_reply"    # Visible to end users
+
+class AuthorType(str):
+    STAFF = "staff"
+    END_USER = "end_user"
+
 # ==================== MODELS ====================
 
 # Auth Models
