@@ -96,7 +96,7 @@ async def seed_database():
             "password_hash": pwd_context.hash("admin123"),
             "role": "admin",
             "status": "active",
-            "is_platform_owner": False,
+            "is_owner": False,
             "last_login": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         },
@@ -108,7 +108,7 @@ async def seed_database():
             "password_hash": pwd_context.hash("super123"),
             "role": "supervisor",
             "status": "active",
-            "is_platform_owner": False,
+            "is_owner": False,
             "last_login": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         },
@@ -120,7 +120,7 @@ async def seed_database():
             "password_hash": pwd_context.hash("tech123"),
             "role": "technician",
             "status": "active",
-            "is_platform_owner": False,
+            "is_owner": False,
             "last_login": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         },
@@ -132,7 +132,7 @@ async def seed_database():
             "password_hash": pwd_context.hash("tech123"),
             "role": "technician",
             "status": "active",
-            "is_platform_owner": False,
+            "is_owner": False,
             "last_login": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
