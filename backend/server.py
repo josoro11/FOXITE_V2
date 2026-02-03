@@ -377,9 +377,10 @@ class TicketCreate(BaseModel):
     description: str
     priority: str = TicketPriority.MEDIUM
     category: Optional[str] = None
+    requester_id: Optional[str] = None
     assigned_staff_id: Optional[str] = None
-    end_user_id: Optional[str] = None
     client_company_id: Optional[str] = None
+    device_id: Optional[str] = None
 
 class TicketUpdate(BaseModel):
     title: Optional[str] = None
