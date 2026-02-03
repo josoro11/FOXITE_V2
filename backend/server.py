@@ -359,14 +359,16 @@ class Ticket(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     organization_id: str
+    ticket_number: int  # Auto-increment per org
     title: str
     description: str
     status: str = TicketStatus.NEW
     priority: str = TicketPriority.MEDIUM
     category: Optional[str] = None
+    requester_id: Optional[str] = None  # End User ID
     assigned_staff_id: Optional[str] = None
-    end_user_id: Optional[str] = None
     client_company_id: Optional[str] = None
+    device_id: Optional[str] = None  # Future: link to device inventory
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
