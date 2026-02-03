@@ -291,14 +291,16 @@ async def seed_database():
         {
             "id": str(uuid.uuid4()),
             "organization_id": org_id,
+            "ticket_number": 6,
             "title": "Password reset - locked account",
             "description": "User locked out after multiple failed login attempts. Need password reset.",
             "status": "resolved",
             "priority": "medium",
             "category": "Access",
             "assigned_staff_id": tech1_id,
-            "end_user_id": end_users[7]["id"],
+            "requester_id": end_users[7]["id"],
             "client_company_id": company3_id,
+            "device_id": None,
             "created_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
             "updated_at": (datetime.now(timezone.utc) - timedelta(days=1, hours=20)).isoformat()
         }
