@@ -1777,6 +1777,176 @@ async def list_agent_sessions(agent_id: str, current_user: dict = Depends(get_cu
     
     return sessions
 
+# ==================== SLA POLICY ROUTES ====================
+
+@api_router.post("/sla-policies", response_model=SLAPolicy)
+async def create_sla_policy(policy_data: SLAPolicyCreate, current_user: dict = Depends(get_current_user)):
+    """Create SLA policy for an organization"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot create SLA policies directly")
+    
+    # Check if admin
+    if current_user.get('role') not in ['admin']:
+        raise HTTPException(status_code=403, detail="Only admins can manage SLA policies")
+    
+    # Check if policy for this priority already exists
+    existing = await db.sla_policies.find_one({
+        "organization_id": org_id,
+        "priority": policy_data.priority
+    }, {"_id": 0})
+    
+    if existing:
+        raise HTTPException(status_code=400, detail=f"SLA policy for priority '{policy_data.priority}' already exists")
+    
+    policy = SLAPolicy(
+        organization_id=org_id,
+        name=policy_data.name,
+        priority=policy_data.priority,
+        response_time_minutes=policy_data.response_time_minutes,
+        resolution_time_minutes=policy_data.resolution_time_minutes
+    )
+    
+    doc = policy.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.sla_policies.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "CREATE", "sla_policy", policy.id)
+    
+    return policy
+
+@api_router.get("/sla-policies", response_model=List[SLAPolicy])
+async def list_sla_policies(current_user: dict = Depends(get_current_user)):
+    """List all SLA policies for organization"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    policies = await db.sla_policies.find({"organization_id": org_id}, {"_id": 0}).to_list(100)
+    
+    for policy in policies:
+        if isinstance(policy.get('created_at'), str):
+            policy['created_at'] = datetime.fromisoformat(policy['created_at'])
+    
+    return policies
+
+@api_router.get("/sla-policies/{policy_id}", response_model=SLAPolicy)
+async def get_sla_policy(policy_id: str, current_user: dict = Depends(get_current_user)):
+    """Get specific SLA policy"""
+    org_id = current_user.get('organization_id')
+    
+    policy = await db.sla_policies.find_one({
+        "id": policy_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not policy:
+        raise HTTPException(status_code=404, detail="SLA policy not found")
+    
+    if isinstance(policy.get('created_at'), str):
+        policy['created_at'] = datetime.fromisoformat(policy['created_at'])
+    
+    return policy
+
+@api_router.patch("/sla-policies/{policy_id}", response_model=SLAPolicy)
+async def update_sla_policy(
+    policy_id: str,
+    update_data: SLAPolicyUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update SLA policy"""
+    org_id = current_user.get('organization_id')
+    
+    if current_user.get('role') not in ['admin']:
+        raise HTTPException(status_code=403, detail="Only admins can update SLA policies")
+    
+    policy = await db.sla_policies.find_one({
+        "id": policy_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not policy:
+        raise HTTPException(status_code=404, detail="SLA policy not found")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    
+    if update_dict:
+        await db.sla_policies.update_one({"id": policy_id}, {"$set": update_dict})
+        await log_audit(org_id, current_user['id'], "UPDATE", "sla_policy", policy_id)
+    
+    updated_policy = await db.sla_policies.find_one({"id": policy_id}, {"_id": 0})
+    
+    if isinstance(updated_policy.get('created_at'), str):
+        updated_policy['created_at'] = datetime.fromisoformat(updated_policy['created_at'])
+    
+    return updated_policy
+
+# ==================== BUSINESS HOURS ROUTES ====================
+
+@api_router.post("/business-hours", response_model=BusinessHours)
+async def create_or_update_business_hours(
+    hours_data: BusinessHoursCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create or update business hours for organization"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin']:
+        raise HTTPException(status_code=403, detail="Only admins can manage business hours")
+    
+    # Check if business hours already exist
+    existing = await db.business_hours.find_one({"organization_id": org_id}, {"_id": 0})
+    
+    if existing:
+        # Update existing
+        update_dict = hours_data.model_dump()
+        await db.business_hours.update_one(
+            {"id": existing['id']},
+            {"$set": update_dict}
+        )
+        await log_audit(org_id, current_user['id'], "UPDATE", "business_hours", existing['id'])
+        
+        updated = await db.business_hours.find_one({"id": existing['id']}, {"_id": 0})
+        if isinstance(updated.get('created_at'), str):
+            updated['created_at'] = datetime.fromisoformat(updated['created_at'])
+        return updated
+    else:
+        # Create new
+        hours = BusinessHours(
+            organization_id=org_id,
+            timezone=hours_data.timezone,
+            work_days=hours_data.work_days,
+            start_time=hours_data.start_time,
+            end_time=hours_data.end_time
+        )
+        
+        doc = hours.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        
+        await db.business_hours.insert_one(doc)
+        await log_audit(org_id, current_user['id'], "CREATE", "business_hours", hours.id)
+        
+        return hours
+
+@api_router.get("/business-hours", response_model=BusinessHours)
+async def get_business_hours(current_user: dict = Depends(get_current_user)):
+    """Get business hours for organization"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    hours = await db.business_hours.find_one({"organization_id": org_id}, {"_id": 0})
+    
+    if not hours:
+        raise HTTPException(status_code=404, detail="Business hours not configured")
+    
+    if isinstance(hours.get('created_at'), str):
+        hours['created_at'] = datetime.fromisoformat(hours['created_at'])
+    
+    return hours
+
 # ==================== TASK ROUTES ====================
 
 @api_router.post("/tasks", response_model=Task)
