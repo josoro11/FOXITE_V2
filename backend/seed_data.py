@@ -29,22 +29,22 @@ async def seed_database():
     await db.subscriptions.delete_many({})
     print("✓ Cleared existing data")
     
-    # 1. Create Platform Owner
-    platform_owner_id = str(uuid.uuid4())
-    platform_owner = {
-        "id": platform_owner_id,
+    # 1. Create SaaS Owner
+    owner_id = str(uuid.uuid4())
+    owner = {
+        "id": owner_id,
         "organization_id": None,
-        "name": "Platform Owner",
+        "name": "SaaS Owner",
         "email": "owner@foxite.com",
         "password_hash": pwd_context.hash("foxite2025"),
-        "role": "platform_owner",
+        "role": "owner",
         "status": "active",
-        "is_platform_owner": True,
+        "is_owner": True,
         "last_login": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.staff_users.insert_one(platform_owner)
-    print(f"✓ Created Platform Owner: owner@foxite.com / foxite2025")
+    await db.staff_users.insert_one(owner)
+    print(f"✓ Created SaaS Owner: owner@foxite.com / foxite2025")
     
     # 2. Create Demo Organization
     org_id = str(uuid.uuid4())
