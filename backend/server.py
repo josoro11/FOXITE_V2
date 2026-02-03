@@ -454,6 +454,44 @@ class SessionManual(BaseModel):
     end_time: datetime
     note: Optional[str] = None
 
+# SLA Models
+class SLAPolicy(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    name: str
+    priority: str  # low, medium, high, urgent
+    response_time_minutes: int
+    resolution_time_minutes: int
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SLAPolicyCreate(BaseModel):
+    name: str
+    priority: str
+    response_time_minutes: int
+    resolution_time_minutes: int
+
+class SLAPolicyUpdate(BaseModel):
+    name: Optional[str] = None
+    response_time_minutes: Optional[int] = None
+    resolution_time_minutes: Optional[int] = None
+
+class BusinessHours(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    timezone: str = "UTC"
+    work_days: List[int] = [1, 2, 3, 4, 5]  # Monday=1 to Sunday=7
+    start_time: str = "09:00"  # HH:MM format
+    end_time: str = "17:00"    # HH:MM format
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class BusinessHoursCreate(BaseModel):
+    timezone: str = "UTC"
+    work_days: List[int] = [1, 2, 3, 4, 5]
+    start_time: str = "09:00"
+    end_time: str = "17:00"
+
 # Task Models
 class Task(BaseModel):
     model_config = ConfigDict(extra="ignore")
