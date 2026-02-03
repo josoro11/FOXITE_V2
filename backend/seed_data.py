@@ -380,6 +380,64 @@ async def seed_database():
     await db.ticket_attachments.insert_many(ticket_attachments)
     print(f"✓ Created 2 Sample Attachments")
     
+    # 6c. Create Sample Sessions (Time Tracking)
+    now = datetime.now(timezone.utc)
+    
+    # Session 1: Completed session (2 hours on ticket 1)
+    session1_start = now - timedelta(hours=3)
+    session1_end = now - timedelta(hours=1)
+    session1_duration = int((session1_end - session1_start).total_seconds() / 60)
+    
+    # Session 2: Completed session (45 minutes on ticket 2)
+    session2_start = now - timedelta(hours=6)
+    session2_end = now - timedelta(hours=5, minutes=15)
+    session2_duration = int((session2_end - session2_start).total_seconds() / 60)
+    
+    # Session 3: Active session (started 30 minutes ago, no end time)
+    session3_start = now - timedelta(minutes=30)
+    
+    sessions = [
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "ticket_id": tickets[0]["id"],
+            "agent_id": tech1_id,
+            "agent_name": "John Tech",
+            "start_time": session1_start.isoformat(),
+            "end_time": session1_end.isoformat(),
+            "duration_minutes": session1_duration,
+            "note": "Fixed Azure AD sync issue",
+            "created_at": session1_start.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "ticket_id": tickets[1]["id"],
+            "agent_id": tech2_id,
+            "agent_name": "Emma Tech",
+            "start_time": session2_start.isoformat(),
+            "end_time": session2_end.isoformat(),
+            "duration_minutes": session2_duration,
+            "note": "Diagnosed printer connection issue",
+            "created_at": session2_start.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "ticket_id": tickets[4]["id"],
+            "agent_id": tech2_id,
+            "agent_name": "Emma Tech",
+            "start_time": session3_start.isoformat(),
+            "end_time": None,
+            "duration_minutes": None,
+            "note": "Currently working on laptop diagnostics",
+            "created_at": session3_start.isoformat()
+        }
+    ]
+    
+    await db.sessions.insert_many(sessions)
+    print(f"✓ Created 3 Sessions (2 completed, 1 active)")
+    
     # 7. Create Tasks
     tasks = [
         {
