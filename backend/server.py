@@ -1058,15 +1058,20 @@ async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(
     if not org_id:
         raise HTTPException(status_code=403, detail="SaaS Owners cannot create tickets directly")
     
+    # Get next ticket number for this organization
+    ticket_number = await get_next_ticket_number(org_id)
+    
     ticket = Ticket(
         organization_id=org_id,
+        ticket_number=ticket_number,
         title=ticket_data.title,
         description=ticket_data.description,
         priority=ticket_data.priority,
         category=ticket_data.category,
+        requester_id=ticket_data.requester_id,
         assigned_staff_id=ticket_data.assigned_staff_id,
-        end_user_id=ticket_data.end_user_id,
-        client_company_id=ticket_data.client_company_id
+        client_company_id=ticket_data.client_company_id,
+        device_id=ticket_data.device_id
     )
     
     doc = ticket.model_dump()
