@@ -1186,7 +1186,7 @@ async def list_tickets(current_user: dict = Depends(get_current_user)):
     
     return tickets
 
-@api_router.get("/tickets/{ticket_id}", response_model=Ticket)
+@api_router.get("/tickets/{ticket_id}")
 async def get_ticket(ticket_id: str, current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     
@@ -1198,6 +1198,15 @@ async def get_ticket(ticket_id: str, current_user: dict = Depends(get_current_us
         ticket['created_at'] = datetime.fromisoformat(ticket['created_at'])
     if isinstance(ticket.get('updated_at'), str):
         ticket['updated_at'] = datetime.fromisoformat(ticket['updated_at'])
+    
+    # Calculate total time spent from sessions
+    sessions = await db.sessions.find(
+        {"ticket_id": ticket_id, "organization_id": org_id},
+        {"_id": 0, "duration_minutes": 1}
+    ).to_list(1000)
+    
+    total_time_spent = sum(s.get('duration_minutes', 0) for s in sessions if s.get('duration_minutes'))
+    ticket['total_time_spent'] = total_time_spent
     
     return ticket
 
