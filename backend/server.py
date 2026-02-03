@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
@@ -41,11 +41,134 @@ security = HTTPBearer()
 app = FastAPI(title="FOXITE API")
 api_router = APIRouter(prefix="/api")
 
-# ==================== MODELS ====================
+# ==================== PLAN DEFINITIONS ====================
 
-# Enums
+PLAN_FEATURES = {
+    "CORE": {
+        "name": "CORE",
+        "price": 25,
+        "currency": "USD",
+        "max_staff_users": 3,
+        "features": {
+            "tickets": True,
+            "end_users": True,
+            "tasks": True,
+            "devices_inventory": True,
+            "licenses_inventory": False,
+            "knowledge_base": True,
+            "calendar": True,
+            "email_notifications": True,
+            "ai_features": False,
+            "sla_management": "basic",
+            "reports": "basic",
+            "api_access": False,
+            "end_user_portal_customization": False,
+            "workflows": False,
+            "saved_filters": False,
+            "custom_dashboards": False,
+            "audit_logs": False,
+            "alerts_escalations": "basic"
+        }
+    },
+    "PLUS": {
+        "name": "PLUS",
+        "price": 55,
+        "currency": "USD",
+        "max_staff_users": 10,
+        "features": {
+            "tickets": True,
+            "end_users": True,
+            "tasks": True,
+            "devices_inventory": True,
+            "licenses_inventory": True,
+            "knowledge_base": True,
+            "calendar": True,
+            "email_notifications": True,
+            "ai_features": "limited",
+            "sla_management": "advanced",
+            "reports": "advanced",
+            "api_access": "read_only",
+            "end_user_portal_customization": False,
+            "workflows": True,
+            "saved_filters": True,
+            "custom_dashboards": False,
+            "audit_logs": False,
+            "alerts_escalations": "advanced"
+        }
+    },
+    "PRIME": {
+        "name": "PRIME",
+        "price": 90,
+        "currency": "USD",
+        "max_staff_users": 999999,  # Unlimited
+        "features": {
+            "tickets": True,
+            "end_users": True,
+            "tasks": True,
+            "devices_inventory": True,
+            "licenses_inventory": True,
+            "knowledge_base": True,
+            "calendar": True,
+            "email_notifications": True,
+            "ai_features": "unlimited",
+            "sla_management": "advanced",
+            "reports": "advanced",
+            "api_access": "full",
+            "end_user_portal_customization": True,
+            "workflows": True,
+            "saved_filters": True,
+            "custom_dashboards": True,
+            "audit_logs": True,
+            "alerts_escalations": "advanced"
+        }
+    }
+}
+
+# ==================== FEATURE GATING SYSTEM ====================
+
+async def get_plan_limits(org_id: str) -> Dict[str, Any]:
+    """Get plan limits and features for an organization"""
+    org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    plan_id = org.get('plan', 'CORE')
+    return PLAN_FEATURES.get(plan_id, PLAN_FEATURES["CORE"])
+
+async def can_use_feature(org_id: str, feature_name: str) -> bool:
+    """Check if organization can use a specific feature based on their plan"""
+    try:
+        plan_limits = await get_plan_limits(org_id)
+        feature_value = plan_limits["features"].get(feature_name, False)
+        
+        # Handle boolean features
+        if isinstance(feature_value, bool):
+            return feature_value
+        
+        # Handle tiered features (basic, advanced, unlimited)
+        if isinstance(feature_value, str):
+            return feature_value in ["basic", "advanced", "unlimited", "limited", "read_only", "full"]
+        
+        return False
+    except:
+        return False
+
+async def check_staff_limit(org_id: str) -> bool:
+    """Check if organization can add more staff users"""
+    plan_limits = await get_plan_limits(org_id)
+    max_staff = plan_limits.get("max_staff_users", 3)
+    
+    current_staff = await db.staff_users.count_documents({
+        "organization_id": org_id,
+        "status": "active"
+    })
+    
+    return current_staff < max_staff
+
+# ==================== ENUMS ====================
+
 class UserRole(str):
-    PLATFORM_OWNER = "platform_owner"
+    OWNER = "owner"  # SaaS Owner
     ADMIN = "admin"
     SUPERVISOR = "supervisor"
     TECHNICIAN = "technician"
@@ -55,11 +178,21 @@ class PlanType(str):
     CORE = "CORE"
     PLUS = "PLUS"
     PRIME = "PRIME"
-    SCALE = "SCALE"
 
 class OrgStatus(str):
     ACTIVE = "active"
     SUSPENDED = "suspended"
+    TRIAL = "trial"
+
+class SubscriptionStatus(str):
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    CANCELLED = "cancelled"
+    TRIALING = "trialing"
+
+class BillingCycle(str):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
 
 class TicketStatus(str):
     NEW = "new"
@@ -84,6 +217,8 @@ class Language(str):
     EN = "en"
     ES = "es"
 
+# ==================== MODELS ====================
+
 # Auth Models
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -100,32 +235,67 @@ class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
 
+# Subscription Models
+class Subscription(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    org_id: str
+    plan_id: str
+    billing_cycle: str = BillingCycle.MONTHLY
+    status: str = SubscriptionStatus.ACTIVE
+    start_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    next_billing_date: Optional[datetime] = None
+    discount_percent: float = 0.0
+    override_price: Optional[float] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SubscriptionCreate(BaseModel):
+    org_id: str
+    plan_id: str
+    billing_cycle: str = BillingCycle.MONTHLY
+    discount_percent: float = 0.0
+    override_price: Optional[float] = None
+
 # Organization Models
 class Organization(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    legal_name: Optional[str] = None
+    country: str = "US"
+    timezone: str = "UTC"
+    language: str = Language.EN
     plan: str = PlanType.CORE
     status: str = OrgStatus.ACTIVE
-    language: str = Language.EN
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    max_staff_users: int = 5  # Based on plan
 
 class OrganizationCreate(BaseModel):
     name: str
-    plan: str = PlanType.CORE
+    legal_name: Optional[str] = None
+    country: str = "US"
+    timezone: str = "UTC"
     language: str = Language.EN
+    plan: str = PlanType.CORE
+
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = None
+    legal_name: Optional[str] = None
+    country: Optional[str] = None
+    timezone: Optional[str] = None
+    language: Optional[str] = None
+    plan: Optional[str] = None
+    status: Optional[str] = None
 
 # Staff User Models
 class StaffUser(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    organization_id: Optional[str] = None  # None for Platform Owner
+    organization_id: Optional[str] = None  # None for SaaS Owner
     name: str
     email: EmailStr
     role: str
     status: str = "active"
-    is_platform_owner: bool = False
+    is_owner: bool = False  # SaaS Owner flag
     last_login: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -293,7 +463,19 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     return user
 
+async def require_owner(current_user: dict = Depends(get_current_user)):
+    """Require SaaS Owner role"""
+    if not current_user.get('is_owner'):
+        raise HTTPException(status_code=403, detail="SaaS Owner access required")
+    return current_user
+
 async def log_audit(organization_id: str, user_id: str, action: str, entity_type: str, entity_id: str, details: dict = {}):
+    # Only log if organization has audit logs enabled
+    if organization_id:
+        has_audit = await can_use_feature(organization_id, "audit_logs")
+        if not has_audit:
+            return
+    
     audit = AuditLog(
         organization_id=organization_id,
         user_id=user_id,
@@ -337,17 +519,13 @@ async def register(user_data: StaffUserCreate):
     
     # Check staff limit for organization
     if user_data.organization_id:
+        can_add = await check_staff_limit(user_data.organization_id)
+        if not can_add:
+            raise HTTPException(status_code=400, detail="Staff user limit reached for this plan")
+        
         org = await db.organizations.find_one({"id": user_data.organization_id}, {"_id": 0})
         if not org:
             raise HTTPException(status_code=404, detail="Organization not found")
-        
-        staff_count = await db.staff_users.count_documents({
-            "organization_id": user_data.organization_id,
-            "status": "active"
-        })
-        
-        if staff_count >= org.get('max_staff_users', 5):
-            raise HTTPException(status_code=400, detail="Staff user limit reached for this plan")
     
     # Hash password
     hashed_pwd = hash_password(user_data.password)
@@ -358,7 +536,7 @@ async def register(user_data: StaffUserCreate):
         email=user_data.email,
         role=user_data.role,
         organization_id=user_data.organization_id,
-        is_platform_owner=user_data.organization_id is None
+        is_owner=user_data.organization_id is None and user_data.role == UserRole.OWNER
     )
     
     doc = user.model_dump()
@@ -397,10 +575,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 async def request_password_reset(request: PasswordResetRequest):
     user = await db.staff_users.find_one({"email": request.email}, {"_id": 0})
     if not user:
-        # Don't reveal if email exists
         return {"message": "If email exists, reset link has been sent"}
     
-    # Create reset token (valid for 1 hour)
     reset_token = create_access_token({
         "user_id": user['id'],
         "purpose": "password_reset",
@@ -414,7 +590,7 @@ async def request_password_reset(request: PasswordResetRequest):
         <body style="font-family: Arial, sans-serif;">
             <h2>Password Reset Request</h2>
             <p>Click the link below to reset your password:</p>
-            <a href="{reset_link}" style="background: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
+            <a href="{reset_link}" style="background: #f97316; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
             <p>This link expires in 1 hour.</p>
             <p>If you didn't request this, please ignore this email.</p>
         </body>
@@ -434,7 +610,6 @@ async def confirm_password_reset(request: PasswordResetConfirm):
         
         user_id = payload.get('user_id')
         
-        # Update password
         hashed_pwd = hash_password(request.new_password)
         result = await db.staff_users.update_one(
             {"id": user_id},
@@ -448,41 +623,205 @@ async def confirm_password_reset(request: PasswordResetConfirm):
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
+# ==================== SAAS OWNER ROUTES ====================
+
+@api_router.get("/owner/metrics")
+async def get_owner_metrics(current_user: dict = Depends(require_owner)):
+    """Get SaaS-level metrics for owner dashboard"""
+    total_orgs = await db.organizations.count_documents({})
+    active_orgs = await db.organizations.count_documents({"status": "active"})
+    suspended_orgs = await db.organizations.count_documents({"status": "suspended"})
+    total_staff = await db.staff_users.count_documents({"is_owner": False})
+    total_tickets = await db.tickets.count_documents({})
+    
+    # Calculate MRR (Monthly Recurring Revenue) placeholder
+    subscriptions = await db.subscriptions.find({"status": "active"}, {"_id": 0}).to_list(1000)
+    mrr = 0
+    for sub in subscriptions:
+        plan_info = PLAN_FEATURES.get(sub.get('plan_id', 'CORE'), PLAN_FEATURES['CORE'])
+        price = sub.get('override_price') or plan_info['price']
+        discount = sub.get('discount_percent', 0)
+        final_price = price * (1 - discount / 100)
+        
+        if sub.get('billing_cycle') == 'yearly':
+            final_price = final_price / 12
+        
+        mrr += final_price
+    
+    # AI usage placeholder
+    ai_usage = {
+        "total_requests": 0,
+        "organizations_using_ai": 0
+    }
+    
+    # Storage usage placeholder
+    storage_usage = {
+        "total_gb": 0,
+        "organizations": []
+    }
+    
+    return {
+        "organizations": {
+            "total": total_orgs,
+            "active": active_orgs,
+            "suspended": suspended_orgs
+        },
+        "users": {
+            "total_staff": total_staff
+        },
+        "tickets": {
+            "total": total_tickets
+        },
+        "revenue": {
+            "mrr": round(mrr, 2),
+            "currency": "USD"
+        },
+        "ai_usage": ai_usage,
+        "storage_usage": storage_usage
+    }
+
+@api_router.get("/owner/organizations")
+async def list_all_organizations(current_user: dict = Depends(require_owner)):
+    """List all organizations with subscription details"""
+    orgs = await db.organizations.find({}, {"_id": 0}).to_list(1000)
+    
+    for org in orgs:
+        if isinstance(org.get('created_at'), str):
+            org['created_at'] = datetime.fromisoformat(org['created_at'])
+        
+        # Get subscription
+        sub = await db.subscriptions.find_one({"org_id": org['id']}, {"_id": 0})
+        org['subscription'] = sub
+        
+        # Get staff count
+        staff_count = await db.staff_users.count_documents({
+            "organization_id": org['id'],
+            "status": "active"
+        })
+        org['staff_count'] = staff_count
+        
+        # Get plan limits
+        plan_info = PLAN_FEATURES.get(org.get('plan', 'CORE'), PLAN_FEATURES['CORE'])
+        org['plan_info'] = plan_info
+    
+    return orgs
+
+@api_router.patch("/owner/organizations/{org_id}")
+async def update_organization_as_owner(
+    org_id: str,
+    update_data: OrganizationUpdate,
+    current_user: dict = Depends(require_owner)
+):
+    """SaaS Owner can update any organization"""
+    org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    
+    if update_dict:
+        await db.organizations.update_one({"id": org_id}, {"$set": update_dict})
+        await log_audit("SYSTEM", current_user['id'], "UPDATE", "organization", org_id, update_dict)
+    
+    updated_org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    
+    if isinstance(updated_org.get('created_at'), str):
+        updated_org['created_at'] = datetime.fromisoformat(updated_org['created_at'])
+    
+    return updated_org
+
+@api_router.get("/owner/plans")
+async def get_all_plans(current_user: dict = Depends(require_owner)):
+    """Get all available subscription plans"""
+    return PLAN_FEATURES
+
+# ==================== SUBSCRIPTION ROUTES ====================
+
+@api_router.post("/subscriptions", response_model=Subscription)
+async def create_subscription(sub_data: SubscriptionCreate, current_user: dict = Depends(require_owner)):
+    """Create subscription for an organization (Owner only)"""
+    org = await db.organizations.find_one({"id": sub_data.org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check if subscription already exists
+    existing = await db.subscriptions.find_one({"org_id": sub_data.org_id}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Subscription already exists for this organization")
+    
+    # Calculate next billing date
+    start = datetime.now(timezone.utc)
+    if sub_data.billing_cycle == BillingCycle.MONTHLY:
+        next_billing = start + timedelta(days=30)
+    else:
+        next_billing = start + timedelta(days=365)
+    
+    subscription = Subscription(
+        org_id=sub_data.org_id,
+        plan_id=sub_data.plan_id,
+        billing_cycle=sub_data.billing_cycle,
+        start_date=start,
+        next_billing_date=next_billing,
+        discount_percent=sub_data.discount_percent,
+        override_price=sub_data.override_price
+    )
+    
+    doc = subscription.model_dump()
+    doc['start_date'] = doc['start_date'].isoformat()
+    doc['next_billing_date'] = doc['next_billing_date'].isoformat()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.subscriptions.insert_one(doc)
+    await log_audit("SYSTEM", current_user['id'], "CREATE", "subscription", subscription.id)
+    
+    return subscription
+
+@api_router.get("/subscriptions/{org_id}")
+async def get_subscription(org_id: str, current_user: dict = Depends(get_current_user)):
+    """Get subscription for an organization"""
+    # Check permissions
+    if not current_user.get('is_owner') and current_user.get('organization_id') != org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    sub = await db.subscriptions.find_one({"org_id": org_id}, {"_id": 0})
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    if isinstance(sub.get('start_date'), str):
+        sub['start_date'] = datetime.fromisoformat(sub['start_date'])
+    if sub.get('next_billing_date') and isinstance(sub.get('next_billing_date'), str):
+        sub['next_billing_date'] = datetime.fromisoformat(sub['next_billing_date'])
+    if isinstance(sub.get('created_at'), str):
+        sub['created_at'] = datetime.fromisoformat(sub['created_at'])
+    
+    return sub
+
 # ==================== ORGANIZATION ROUTES ====================
 
 @api_router.post("/organizations", response_model=Organization)
-async def create_organization(org_data: OrganizationCreate, current_user: dict = Depends(get_current_user)):
-    # Only platform owners can create organizations
-    if not current_user.get('is_platform_owner'):
-        raise HTTPException(status_code=403, detail="Only platform owners can create organizations")
-    
-    # Set max staff based on plan
-    plan_limits = {
-        PlanType.CORE: 5,
-        PlanType.PLUS: 15,
-        PlanType.PRIME: 50,
-        PlanType.SCALE: 999999
-    }
-    
+async def create_organization(org_data: OrganizationCreate, current_user: dict = Depends(require_owner)):
+    """Create organization (SaaS Owner only)"""
     org = Organization(
         name=org_data.name,
-        plan=org_data.plan,
+        legal_name=org_data.legal_name,
+        country=org_data.country,
+        timezone=org_data.timezone,
         language=org_data.language,
-        max_staff_users=plan_limits.get(org_data.plan, 5)
+        plan=org_data.plan
     )
     
     doc = org.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     
     await db.organizations.insert_one(doc)
-    await log_audit(org.id, current_user['id'], "CREATE", "organization", org.id)
+    await log_audit("SYSTEM", current_user['id'], "CREATE", "organization", org.id)
     
     return org
 
 @api_router.get("/organizations", response_model=List[Organization])
 async def list_organizations(current_user: dict = Depends(get_current_user)):
-    # Platform owners see all, others see only their org
-    if current_user.get('is_platform_owner'):
+    """List organizations - Owner sees all, others see only their org"""
+    if current_user.get('is_owner'):
         orgs = await db.organizations.find({}, {"_id": 0}).to_list(1000)
     else:
         org_id = current_user.get('organization_id')
@@ -498,8 +837,8 @@ async def list_organizations(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/organizations/{org_id}", response_model=Organization)
 async def get_organization(org_id: str, current_user: dict = Depends(get_current_user)):
-    # Check permissions
-    if not current_user.get('is_platform_owner') and current_user.get('organization_id') != org_id:
+    """Get organization details"""
+    if not current_user.get('is_owner') and current_user.get('organization_id') != org_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
@@ -511,17 +850,24 @@ async def get_organization(org_id: str, current_user: dict = Depends(get_current
     
     return org
 
+@api_router.get("/organizations/{org_id}/features")
+async def get_organization_features(org_id: str, current_user: dict = Depends(get_current_user)):
+    """Get available features for an organization based on their plan"""
+    if not current_user.get('is_owner') and current_user.get('organization_id') != org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    plan_limits = await get_plan_limits(org_id)
+    return plan_limits
+
 # ==================== STAFF USER ROUTES ====================
 
 @api_router.get("/staff-users", response_model=List[StaffUser])
 async def list_staff_users(current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     
-    if current_user.get('is_platform_owner'):
-        # Platform owners see all
+    if current_user.get('is_owner'):
         users = await db.staff_users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     else:
-        # Others see only their org
         users = await db.staff_users.find({"organization_id": org_id}, {"_id": 0, "password_hash": 0}).to_list(1000)
     
     for user in users:
@@ -538,8 +884,7 @@ async def update_staff_user(user_id: str, update_data: StaffUserUpdate, current_
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Check permissions
-    if not current_user.get('is_platform_owner'):
+    if not current_user.get('is_owner'):
         if current_user.get('organization_id') != user.get('organization_id'):
             raise HTTPException(status_code=403, detail="Access denied")
         if current_user.get('role') not in [UserRole.ADMIN]:
@@ -549,7 +894,7 @@ async def update_staff_user(user_id: str, update_data: StaffUserUpdate, current_
     
     if update_dict:
         await db.staff_users.update_one({"id": user_id}, {"$set": update_dict})
-        await log_audit(user.get('organization_id', ''), current_user['id'], "UPDATE", "staff_user", user_id)
+        await log_audit(user.get('organization_id', 'SYSTEM'), current_user['id'], "UPDATE", "staff_user", user_id)
     
     updated_user = await db.staff_users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     
@@ -566,7 +911,7 @@ async def update_staff_user(user_id: str, update_data: StaffUserUpdate, current_
 async def create_client_company(company_data: ClientCompanyCreate, current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners cannot create client companies directly")
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot create client companies directly")
     
     company = ClientCompany(
         organization_id=org_id,
@@ -588,7 +933,7 @@ async def create_client_company(company_data: ClientCompanyCreate, current_user:
 async def list_client_companies(current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners must specify organization")
+        raise HTTPException(status_code=403, detail="SaaS Owners must specify organization")
     
     companies = await db.client_companies.find({"organization_id": org_id}, {"_id": 0}).to_list(1000)
     
@@ -604,9 +949,8 @@ async def list_client_companies(current_user: dict = Depends(get_current_user)):
 async def create_end_user(user_data: EndUserCreate, current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners cannot create end users directly")
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot create end users directly")
     
-    # Verify client company belongs to org
     company = await db.client_companies.find_one({
         "id": user_data.client_company_id,
         "organization_id": org_id
@@ -634,7 +978,7 @@ async def create_end_user(user_data: EndUserCreate, current_user: dict = Depends
 async def list_end_users(current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners must specify organization")
+        raise HTTPException(status_code=403, detail="SaaS Owners must specify organization")
     
     users = await db.end_users.find({"organization_id": org_id}, {"_id": 0}).to_list(1000)
     
@@ -650,7 +994,7 @@ async def list_end_users(current_user: dict = Depends(get_current_user)):
 async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners cannot create tickets directly")
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot create tickets directly")
     
     ticket = Ticket(
         organization_id=org_id,
@@ -676,9 +1020,8 @@ async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(
 async def list_tickets(current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners must specify organization")
+        raise HTTPException(status_code=403, detail="SaaS Owners must specify organization")
     
-    # Technicians only see assigned tickets
     query = {"organization_id": org_id}
     if current_user.get('role') == UserRole.TECHNICIAN:
         query["assigned_staff_id"] = current_user['id']
@@ -738,7 +1081,12 @@ async def update_ticket(ticket_id: str, update_data: TicketUpdate, current_user:
 async def create_task(task_data: TaskCreate, current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners cannot create tasks directly")
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot create tasks directly")
+    
+    # Check if organization has tasks feature
+    has_tasks = await can_use_feature(org_id, "tasks")
+    if not has_tasks:
+        raise HTTPException(status_code=403, detail="Tasks feature not available in your plan")
     
     task = Task(
         organization_id=org_id,
@@ -763,7 +1111,7 @@ async def create_task(task_data: TaskCreate, current_user: dict = Depends(get_cu
 async def list_tasks(current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     if not org_id:
-        raise HTTPException(status_code=403, detail="Platform owners must specify organization")
+        raise HTTPException(status_code=403, detail="SaaS Owners must specify organization")
     
     query = {"organization_id": org_id}
     if current_user.get('role') == UserRole.TECHNICIAN:
@@ -785,12 +1133,12 @@ async def list_tasks(current_user: dict = Depends(get_current_user)):
 async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     
-    if current_user.get('is_platform_owner'):
-        # Platform owner stats
+    if current_user.get('is_owner'):
+        # SaaS Owner stats
         total_orgs = await db.organizations.count_documents({})
         active_orgs = await db.organizations.count_documents({"status": "active"})
         total_tickets = await db.tickets.count_documents({})
-        total_users = await db.staff_users.count_documents({})
+        total_users = await db.staff_users.count_documents({"is_owner": False})
         
         return {
             "total_organizations": total_orgs,
@@ -801,13 +1149,19 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     else:
         # Organization stats
         total_tickets = await db.tickets.count_documents({"organization_id": org_id})
-        open_tickets = await db.tickets.count_documents({"organization_id": org_id, "status": {"$in": ["new", "open", "in_progress"]}})
-        total_staff = await db.staff_users.count_documents({"organization_id": org_id, "status": "active"})
+        open_tickets = await db.tickets.count_documents({
+            "organization_id": org_id,
+            "status": {"$in": ["new", "open", "in_progress"]}
+        })
+        total_staff = await db.staff_users.count_documents({
+            "organization_id": org_id,
+            "status": "active"
+        })
         total_end_users = await db.end_users.count_documents({"organization_id": org_id})
         total_companies = await db.client_companies.count_documents({"organization_id": org_id})
         
-        # Get organization
         org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+        plan_limits = await get_plan_limits(org_id)
         
         return {
             "organization": org.get('name') if org else '',
@@ -815,7 +1169,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
             "total_tickets": total_tickets,
             "open_tickets": open_tickets,
             "total_staff": total_staff,
-            "max_staff": org.get('max_staff_users', 5) if org else 5,
+            "max_staff": plan_limits.get('max_staff_users', 3),
             "total_end_users": total_end_users,
             "total_client_companies": total_companies
         }
