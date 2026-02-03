@@ -426,6 +426,34 @@ class TicketAttachmentCreate(BaseModel):
     file_type: str
     file_size: int
 
+# Session (Time Tracking) Models
+class Session(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    ticket_id: str
+    agent_id: str
+    agent_name: str  # Denormalized for display
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None  # Auto-calculated
+    note: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SessionStart(BaseModel):
+    ticket_id: str
+    note: Optional[str] = None
+
+class SessionStop(BaseModel):
+    session_id: str
+    note: Optional[str] = None
+
+class SessionManual(BaseModel):
+    ticket_id: str
+    start_time: datetime
+    end_time: datetime
+    note: Optional[str] = None
+
 # Task Models
 class Task(BaseModel):
     model_config = ConfigDict(extra="ignore")
