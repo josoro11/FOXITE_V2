@@ -351,7 +351,7 @@ async def seed_database():
     
     print("\n✅ Database seeding complete!")
     print("\n=== LOGIN CREDENTIALS ===")
-    print("Platform Owner: owner@foxite.com / foxite2025")
+    print("SaaS Owner: owner@foxite.com / foxite2025")
     print("Admin: admin@techpro.com / admin123")
     print("Supervisor: supervisor@techpro.com / super123")
     print("Technician: tech1@techpro.com / tech123")
