@@ -865,7 +865,7 @@ async def get_organization_features(org_id: str, current_user: dict = Depends(ge
 async def list_staff_users(current_user: dict = Depends(get_current_user)):
     org_id = current_user.get('organization_id')
     
-    if current_user.get('is_owner'):
+    if current_user.get('is_platform_owner'):
         users = await db.staff_users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     else:
         users = await db.staff_users.find({"organization_id": org_id}, {"_id": 0, "password_hash": 0}).to_list(1000)
