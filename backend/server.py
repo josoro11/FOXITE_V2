@@ -1142,6 +1142,142 @@ async def update_ticket(ticket_id: str, update_data: TicketUpdate, current_user:
     
     return updated_ticket
 
+# ==================== TICKET COMMENTS ====================
+
+@api_router.post("/tickets/{ticket_id}/comments", response_model=TicketComment)
+async def create_ticket_comment(
+    ticket_id: str,
+    comment_data: TicketCommentCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot create comments")
+    
+    # Verify ticket exists and belongs to org
+    ticket = await db.tickets.find_one({"id": ticket_id, "organization_id": org_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    # Validate comment type
+    if comment_data.comment_type not in [CommentType.INTERNAL_NOTE, CommentType.PUBLIC_REPLY]:
+        raise HTTPException(status_code=400, detail="Invalid comment type")
+    
+    comment = TicketComment(
+        ticket_id=ticket_id,
+        organization_id=org_id,
+        author_id=current_user['id'],
+        author_name=current_user['name'],
+        author_type=AuthorType.STAFF,
+        comment_type=comment_data.comment_type,
+        content=comment_data.content
+    )
+    
+    doc = comment.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.ticket_comments.insert_one(doc)
+    
+    # Update ticket's updated_at timestamp
+    await db.tickets.update_one(
+        {"id": ticket_id},
+        {"$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return comment
+
+@api_router.get("/tickets/{ticket_id}/comments", response_model=List[TicketComment])
+async def list_ticket_comments(
+    ticket_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verify ticket access
+    ticket = await db.tickets.find_one({"id": ticket_id, "organization_id": org_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    # Get comments (filter internal notes for non-staff users if needed)
+    comments = await db.ticket_comments.find(
+        {"ticket_id": ticket_id, "organization_id": org_id},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(1000)
+    
+    for comment in comments:
+        if isinstance(comment.get('created_at'), str):
+            comment['created_at'] = datetime.fromisoformat(comment['created_at'])
+    
+    return comments
+
+# ==================== TICKET ATTACHMENTS ====================
+
+@api_router.post("/tickets/{ticket_id}/attachments", response_model=TicketAttachment)
+async def create_ticket_attachment(
+    ticket_id: str,
+    attachment_data: TicketAttachmentCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot upload attachments")
+    
+    # Verify ticket exists
+    ticket = await db.tickets.find_one({"id": ticket_id, "organization_id": org_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    attachment = TicketAttachment(
+        ticket_id=ticket_id,
+        organization_id=org_id,
+        uploaded_by=current_user['id'],
+        uploaded_by_name=current_user['name'],
+        filename=attachment_data.filename,
+        file_url=attachment_data.file_url,
+        file_type=attachment_data.file_type,
+        file_size=attachment_data.file_size
+    )
+    
+    doc = attachment.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.ticket_attachments.insert_one(doc)
+    
+    # Update ticket's updated_at
+    await db.tickets.update_one(
+        {"id": ticket_id},
+        {"$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return attachment
+
+@api_router.get("/tickets/{ticket_id}/attachments", response_model=List[TicketAttachment])
+async def list_ticket_attachments(
+    ticket_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verify ticket access
+    ticket = await db.tickets.find_one({"id": ticket_id, "organization_id": org_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    attachments = await db.ticket_attachments.find(
+        {"ticket_id": ticket_id, "organization_id": org_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+    
+    for attachment in attachments:
+        if isinstance(attachment.get('created_at'), str):
+            attachment['created_at'] = datetime.fromisoformat(attachment['created_at'])
+    
+    return attachments
+
 # ==================== TASK ROUTES ====================
 
 @api_router.post("/tasks", response_model=Task)
