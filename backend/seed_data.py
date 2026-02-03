@@ -309,6 +309,77 @@ async def seed_database():
     await db.tickets.insert_many(tickets)
     print(f"✓ Created 6 Sample Tickets")
     
+    # 6a. Create Sample Ticket Comments
+    ticket_comments = [
+        {
+            "id": str(uuid.uuid4()),
+            "ticket_id": tickets[0]["id"],
+            "organization_id": org_id,
+            "author_id": tech1_id,
+            "author_name": "John Tech",
+            "author_type": "staff",
+            "comment_type": "internal_note",
+            "content": "Checked with IT team - seems to be an Azure AD sync issue. Working on resolution.",
+            "created_at": (datetime.now(timezone.utc) - timedelta(minutes=45)).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "ticket_id": tickets[0]["id"],
+            "organization_id": org_id,
+            "author_id": tech1_id,
+            "author_name": "John Tech",
+            "author_type": "staff",
+            "comment_type": "public_reply",
+            "content": "Hi, I've identified the issue and am working on a fix. This should be resolved within the next hour.",
+            "created_at": (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "ticket_id": tickets[1]["id"],
+            "organization_id": org_id,
+            "author_id": tech2_id,
+            "author_name": "Emma Tech",
+            "author_type": "staff",
+            "comment_type": "internal_note",
+            "content": "Printer driver needs updating. Will schedule maintenance window.",
+            "created_at": (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
+        }
+    ]
+    
+    await db.ticket_comments.insert_many(ticket_comments)
+    print(f"✓ Created 3 Sample Comments")
+    
+    # 6b. Create Sample Ticket Attachments
+    ticket_attachments = [
+        {
+            "id": str(uuid.uuid4()),
+            "ticket_id": tickets[0]["id"],
+            "organization_id": org_id,
+            "uploaded_by": tech1_id,
+            "uploaded_by_name": "John Tech",
+            "filename": "error_screenshot.png",
+            "file_url": "https://example.com/files/error_screenshot.png",
+            "file_type": "image/png",
+            "file_size": 245678,
+            "created_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "ticket_id": tickets[4]["id"],
+            "organization_id": org_id,
+            "uploaded_by": tech2_id,
+            "uploaded_by_name": "Emma Tech",
+            "filename": "diagnostic_report.pdf",
+            "file_url": "https://example.com/files/diagnostic_report.pdf",
+            "file_type": "application/pdf",
+            "file_size": 1024567,
+            "created_at": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        }
+    ]
+    
+    await db.ticket_attachments.insert_many(ticket_attachments)
+    print(f"✓ Created 2 Sample Attachments")
+    
     # 7. Create Tasks
     tasks = [
         {
