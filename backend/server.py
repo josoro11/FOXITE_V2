@@ -369,6 +369,12 @@ class Ticket(BaseModel):
     assigned_staff_id: Optional[str] = None
     client_company_id: Optional[str] = None
     device_id: Optional[str] = None  # Future: link to device inventory
+    sla_policy_id: Optional[str] = None  # SLA policy applied
+    response_due_at: Optional[datetime] = None  # When first response is due
+    resolution_due_at: Optional[datetime] = None  # When resolution is due
+    first_response_at: Optional[datetime] = None  # When first staff reply was made
+    sla_breached_response: bool = False  # Response SLA breached
+    sla_breached_resolution: bool = False  # Resolution SLA breached
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
