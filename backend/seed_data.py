@@ -26,6 +26,7 @@ async def seed_database():
     await db.tasks.delete_many({})
     await db.notifications.delete_many({})
     await db.audit_logs.delete_many({})
+    await db.subscriptions.delete_many({})
     print("✓ Cleared existing data")
     
     # 1. Create Platform Owner
