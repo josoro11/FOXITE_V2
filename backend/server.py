@@ -389,6 +389,43 @@ class TicketUpdate(BaseModel):
     priority: Optional[str] = None
     assigned_staff_id: Optional[str] = None
 
+# Ticket Comment Models
+class TicketComment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ticket_id: str
+    organization_id: str
+    author_id: str
+    author_name: str  # Denormalized for display
+    author_type: str  # "staff" or "end_user"
+    comment_type: str  # "internal_note" or "public_reply"
+    content: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class TicketCommentCreate(BaseModel):
+    comment_type: str
+    content: str
+
+# Ticket Attachment Models
+class TicketAttachment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ticket_id: str
+    organization_id: str
+    uploaded_by: str
+    uploaded_by_name: str  # Denormalized
+    filename: str
+    file_url: str  # Placeholder URL (no actual storage yet)
+    file_type: str  # mime type
+    file_size: int  # bytes
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class TicketAttachmentCreate(BaseModel):
+    filename: str
+    file_url: str
+    file_type: str
+    file_size: int
+
 # Task Models
 class Task(BaseModel):
     model_config = ConfigDict(extra="ignore")
