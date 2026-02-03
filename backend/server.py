@@ -1361,6 +1361,214 @@ async def list_ticket_attachments(
     
     return attachments
 
+# ==================== SESSION ROUTES ====================
+
+@api_router.post("/sessions/start", response_model=Session)
+async def start_session(session_data: SessionStart, current_user: dict = Depends(get_current_user)):
+    """Start a new time tracking session"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot track time")
+    
+    # Verify ticket exists
+    ticket = await db.tickets.find_one({"id": session_data.ticket_id, "organization_id": org_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    # Check for active sessions
+    active_session = await db.sessions.find_one({
+        "organization_id": org_id,
+        "agent_id": current_user['id'],
+        "end_time": None
+    }, {"_id": 0})
+    
+    if active_session:
+        raise HTTPException(status_code=400, detail="You have an active session. Please stop it before starting a new one.")
+    
+    start_time = datetime.now(timezone.utc)
+    
+    # Check for overlaps (shouldn't happen with active session check, but double-check)
+    has_overlap = await check_session_overlap(org_id, current_user['id'], start_time)
+    if has_overlap:
+        raise HTTPException(status_code=400, detail="Session overlaps with existing session")
+    
+    session = Session(
+        organization_id=org_id,
+        ticket_id=session_data.ticket_id,
+        agent_id=current_user['id'],
+        agent_name=current_user['name'],
+        start_time=start_time,
+        note=session_data.note
+    )
+    
+    doc = session.model_dump()
+    doc['start_time'] = doc['start_time'].isoformat()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.sessions.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "START", "session", session.id)
+    
+    return session
+
+@api_router.post("/sessions/stop", response_model=Session)
+async def stop_session(session_data: SessionStop, current_user: dict = Depends(get_current_user)):
+    """Stop an active time tracking session"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Find the session
+    session = await db.sessions.find_one({
+        "id": session_data.session_id,
+        "organization_id": org_id,
+        "agent_id": current_user['id']
+    }, {"_id": 0})
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if session.get('end_time'):
+        raise HTTPException(status_code=400, detail="Session already stopped")
+    
+    end_time = datetime.now(timezone.utc)
+    start_time = session.get('start_time')
+    
+    if isinstance(start_time, str):
+        start_time = datetime.fromisoformat(start_time)
+    
+    duration = calculate_duration(start_time, end_time)
+    
+    # Update session
+    update_data = {
+        "end_time": end_time.isoformat(),
+        "duration_minutes": duration
+    }
+    
+    if session_data.note:
+        update_data["note"] = session_data.note
+    
+    await db.sessions.update_one(
+        {"id": session_data.session_id},
+        {"$set": update_data}
+    )
+    
+    await log_audit(org_id, current_user['id'], "STOP", "session", session_data.session_id)
+    
+    # Get updated session
+    updated_session = await db.sessions.find_one({"id": session_data.session_id}, {"_id": 0})
+    
+    if isinstance(updated_session.get('start_time'), str):
+        updated_session['start_time'] = datetime.fromisoformat(updated_session['start_time'])
+    if isinstance(updated_session.get('end_time'), str):
+        updated_session['end_time'] = datetime.fromisoformat(updated_session['end_time'])
+    if isinstance(updated_session.get('created_at'), str):
+        updated_session['created_at'] = datetime.fromisoformat(updated_session['created_at'])
+    
+    return updated_session
+
+@api_router.post("/sessions/manual", response_model=Session)
+async def create_manual_session(session_data: SessionManual, current_user: dict = Depends(get_current_user)):
+    """Create a completed session manually (with start and end time)"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot create sessions")
+    
+    # Verify ticket exists
+    ticket = await db.tickets.find_one({"id": session_data.ticket_id, "organization_id": org_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    # Validate times
+    if session_data.end_time <= session_data.start_time:
+        raise HTTPException(status_code=400, detail="End time must be after start time")
+    
+    # Check for overlaps
+    has_overlap = await check_session_overlap(
+        org_id,
+        current_user['id'],
+        session_data.start_time,
+        session_data.end_time
+    )
+    
+    if has_overlap:
+        raise HTTPException(status_code=400, detail="Session overlaps with existing session")
+    
+    duration = calculate_duration(session_data.start_time, session_data.end_time)
+    
+    session = Session(
+        organization_id=org_id,
+        ticket_id=session_data.ticket_id,
+        agent_id=current_user['id'],
+        agent_name=current_user['name'],
+        start_time=session_data.start_time,
+        end_time=session_data.end_time,
+        duration_minutes=duration,
+        note=session_data.note
+    )
+    
+    doc = session.model_dump()
+    doc['start_time'] = doc['start_time'].isoformat()
+    doc['end_time'] = doc['end_time'].isoformat()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.sessions.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "CREATE", "session", session.id)
+    
+    return session
+
+@api_router.get("/tickets/{ticket_id}/sessions", response_model=List[Session])
+async def list_ticket_sessions(ticket_id: str, current_user: dict = Depends(get_current_user)):
+    """List all time tracking sessions for a ticket"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verify ticket access
+    ticket = await db.tickets.find_one({"id": ticket_id, "organization_id": org_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    sessions = await db.sessions.find(
+        {"ticket_id": ticket_id, "organization_id": org_id},
+        {"_id": 0}
+    ).sort("start_time", -1).to_list(1000)
+    
+    for session in sessions:
+        if isinstance(session.get('start_time'), str):
+            session['start_time'] = datetime.fromisoformat(session['start_time'])
+        if session.get('end_time') and isinstance(session.get('end_time'), str):
+            session['end_time'] = datetime.fromisoformat(session['end_time'])
+        if isinstance(session.get('created_at'), str):
+            session['created_at'] = datetime.fromisoformat(session['created_at'])
+    
+    return sessions
+
+@api_router.get("/staff-users/{agent_id}/sessions", response_model=List[Session])
+async def list_agent_sessions(agent_id: str, current_user: dict = Depends(get_current_user)):
+    """List all time tracking sessions for an agent"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verify agent belongs to org and user has access
+    if current_user['id'] != agent_id and current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="You can only view your own sessions")
+    
+    sessions = await db.sessions.find(
+        {"agent_id": agent_id, "organization_id": org_id},
+        {"_id": 0}
+    ).sort("start_time", -1).to_list(1000)
+    
+    for session in sessions:
+        if isinstance(session.get('start_time'), str):
+            session['start_time'] = datetime.fromisoformat(session['start_time'])
+        if session.get('end_time') and isinstance(session.get('end_time'), str):
+            session['end_time'] = datetime.fromisoformat(session['end_time'])
+        if isinstance(session.get('created_at'), str):
+            session['created_at'] = datetime.fromisoformat(session['created_at'])
+    
+    return sessions
+
 # ==================== TASK ROUTES ====================
 
 @api_router.post("/tasks", response_model=Task)
