@@ -537,6 +537,19 @@ async def log_audit(organization_id: str, user_id: str, action: str, entity_type
     doc['timestamp'] = doc['timestamp'].isoformat()
     await db.audit_logs.insert_one(doc)
 
+async def get_next_ticket_number(org_id: str) -> int:
+    """Get next auto-increment ticket number for organization"""
+    # Find the highest ticket number for this org
+    highest = await db.tickets.find_one(
+        {"organization_id": org_id},
+        {"_id": 0, "ticket_number": 1},
+        sort=[("ticket_number", -1)]
+    )
+    
+    if highest and highest.get('ticket_number'):
+        return highest['ticket_number'] + 1
+    return 1  # First ticket
+
 async def send_email_async(recipient: str, subject: str, html: str):
     """Send email asynchronously"""
     if not resend.api_key or resend.api_key == 're_placeholder_add_your_key':
