@@ -51,14 +51,35 @@ async def seed_database():
     organization = {
         "id": org_id,
         "name": "TechPro MSP",
+        "legal_name": "TechPro Managed Services Ltd.",
+        "country": "US",
+        "timezone": "America/New_York",
+        "language": "en",
         "plan": "PLUS",
         "status": "active",
-        "language": "en",
-        "max_staff_users": 15,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.organizations.insert_one(organization)
     print(f"✓ Created Organization: TechPro MSP (PLUS plan)")
+    
+    # Create subscription for the organization
+    subscription_id = str(uuid.uuid4())
+    start_date = datetime.now(timezone.utc)
+    next_billing = start_date + timedelta(days=30)
+    subscription = {
+        "id": subscription_id,
+        "org_id": org_id,
+        "plan_id": "PLUS",
+        "billing_cycle": "monthly",
+        "status": "active",
+        "start_date": start_date.isoformat(),
+        "next_billing_date": next_billing.isoformat(),
+        "discount_percent": 0.0,
+        "override_price": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.subscriptions.insert_one(subscription)
+    print(f"✓ Created Subscription: $55/month (PLUS plan)")
     
     # 3. Create Staff Users
     admin_id = str(uuid.uuid4())
