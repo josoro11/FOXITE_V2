@@ -86,6 +86,62 @@ async def seed_database():
     await db.subscriptions.insert_one(subscription)
     print(f"✓ Created Subscription: $55/month (PLUS plan)")
     
+    # 2a. Create Business Hours (Mon-Fri, 9 AM - 5 PM EST)
+    business_hours_id = str(uuid.uuid4())
+    business_hours = {
+        "id": business_hours_id,
+        "organization_id": org_id,
+        "timezone": "America/New_York",
+        "work_days": [1, 2, 3, 4, 5],  # Monday through Friday
+        "start_time": "09:00",
+        "end_time": "17:00",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.business_hours.insert_one(business_hours)
+    print(f"✓ Created Business Hours: Mon-Fri 9-5 EST")
+    
+    # 2b. Create SLA Policies (one per priority)
+    sla_policies = [
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "name": "Low Priority SLA",
+            "priority": "low",
+            "response_time_minutes": 480,  # 8 hours
+            "resolution_time_minutes": 2880,  # 2 business days
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "name": "Medium Priority SLA",
+            "priority": "medium",
+            "response_time_minutes": 240,  # 4 hours
+            "resolution_time_minutes": 1440,  # 1 business day
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "name": "High Priority SLA",
+            "priority": "high",
+            "response_time_minutes": 120,  # 2 hours
+            "resolution_time_minutes": 480,  # 8 hours
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "name": "Urgent Priority SLA",
+            "priority": "urgent",
+            "response_time_minutes": 30,  # 30 minutes
+            "resolution_time_minutes": 240,  # 4 hours
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+    ]
+    await db.sla_policies.insert_many(sla_policies)
+    print(f"✓ Created 4 SLA Policies (Low/Medium/High/Urgent)")
+    
     # 3. Create Staff Users
     admin_id = str(uuid.uuid4())
     supervisor_id = str(uuid.uuid4())
