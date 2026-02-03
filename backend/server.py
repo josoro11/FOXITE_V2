@@ -197,6 +197,7 @@ class BillingCycle(str):
 class TicketStatus(str):
     NEW = "new"
     OPEN = "open"
+    PENDING = "pending"
     IN_PROGRESS = "in_progress"
     ON_HOLD = "on_hold"
     RESOLVED = "resolved"
