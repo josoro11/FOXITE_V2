@@ -29,6 +29,7 @@ async def seed_database():
     await db.subscriptions.delete_many({})
     await db.ticket_comments.delete_many({})
     await db.ticket_attachments.delete_many({})
+    await db.sessions.delete_many({})
     print("✓ Cleared existing data")
     
     # 1. Create SaaS Owner
