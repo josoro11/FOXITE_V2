@@ -33,6 +33,8 @@ async def seed_database():
     await db.sla_policies.delete_many({})
     await db.business_hours.delete_many({})
     await db.saved_views.delete_many({})
+    await db.devices.delete_many({})
+    await db.licenses.delete_many({})
     print("✓ Cleared existing data")
     
     # 1. Create SaaS Owner
