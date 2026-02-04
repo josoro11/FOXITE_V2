@@ -845,6 +845,90 @@ async def check_sla_breach(ticket: dict):
     if updates:
         await db.tickets.update_one({"id": ticket['id']}, {"$set": updates})
 
+def parse_filters(filters: dict, entity_type: str) -> dict:
+    """Parse filter parameters into MongoDB query"""
+    query = {}
+    
+    # Common filters
+    if filters.get('status'):
+        query['status'] = filters['status']
+    
+    if filters.get('priority'):
+        query['priority'] = filters['priority']
+    
+    if filters.get('assigned_to'):
+        query['assigned_staff_id'] = filters['assigned_to']
+    
+    if filters.get('created_at_from') or filters.get('created_at_to'):
+        query['created_at'] = {}
+        if filters.get('created_at_from'):
+            query['created_at']['$gte'] = filters['created_at_from']
+        if filters.get('created_at_to'):
+            query['created_at']['$lte'] = filters['created_at_to']
+    
+    if filters.get('updated_at_from') or filters.get('updated_at_to'):
+        query['updated_at'] = {}
+        if filters.get('updated_at_from'):
+            query['updated_at']['$gte'] = filters['updated_at_from']
+        if filters.get('updated_at_to'):
+            query['updated_at']['$lte'] = filters['updated_at_to']
+    
+    # Entity-specific filters
+    if entity_type == 'tickets':
+        if filters.get('ticket_number'):
+            query['ticket_number'] = filters['ticket_number']
+        
+        if filters.get('requester_id'):
+            query['requester_id'] = filters['requester_id']
+        
+        if filters.get('sla_breached_response') is not None:
+            query['sla_breached_response'] = filters['sla_breached_response']
+        
+        if filters.get('sla_breached_resolution') is not None:
+            query['sla_breached_resolution'] = filters['sla_breached_resolution']
+        
+        # Text search on title and description
+        if filters.get('search'):
+            query['$or'] = [
+                {'title': {'$regex': filters['search'], '$options': 'i'}},
+                {'description': {'$regex': filters['search'], '$options': 'i'}}
+            ]
+    
+    elif entity_type == 'tasks':
+        if filters.get('due_date_from') or filters.get('due_date_to'):
+            query['due_date'] = {}
+            if filters.get('due_date_from'):
+                query['due_date']['$gte'] = filters['due_date_from']
+            if filters.get('due_date_to'):
+                query['due_date']['$lte'] = filters['due_date_to']
+        
+        if filters.get('completed') is not None:
+            query['status'] = 'done' if filters['completed'] else {'$ne': 'done'}
+        
+        # Text search on title
+        if filters.get('search'):
+            query['title'] = {'$regex': filters['search'], '$options': 'i'}
+    
+    elif entity_type == 'sessions':
+        if filters.get('agent_id'):
+            query['agent_id'] = filters['agent_id']
+        
+        if filters.get('ticket_id'):
+            query['ticket_id'] = filters['ticket_id']
+        
+        if filters.get('start_time_from') or filters.get('start_time_to'):
+            query['start_time'] = {}
+            if filters.get('start_time_from'):
+                query['start_time']['$gte'] = filters['start_time_from']
+            if filters.get('start_time_to'):
+                query['start_time']['$lte'] = filters['start_time_to']
+        
+        # Text search on note
+        if filters.get('search'):
+            query['note'] = {'$regex': filters['search'], '$options': 'i'}
+    
+    return query
+
 async def send_email_async(recipient: str, subject: str, html: str):
     """Send email asynchronously"""
     if not resend.api_key or resend.api_key == 're_placeholder_add_your_key':
