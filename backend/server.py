@@ -2823,29 +2823,6 @@ async def delete_license(license_id: str, current_user: dict = Depends(get_curre
     
     return {"message": "License deleted"}
 
-@api_router.get("/licenses/expiring", response_model=List[License])
-async def list_expiring_licenses(current_user: dict = Depends(get_current_user)):
-    """List licenses expiring soon (shortcut endpoint)"""
-    org_id = current_user.get('organization_id')
-    if not org_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    licenses = await db.licenses.find({
-        "organization_id": org_id,
-        "expiring_soon": True
-    }, {"_id": 0}).to_list(1000)
-    
-    # Convert datetime strings and recalculate
-    for license_obj in licenses:
-        for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
-            if license_obj.get(field) and isinstance(license_obj[field], str):
-                license_obj[field] = datetime.fromisoformat(license_obj[field])
-        
-        expiration_status = calculate_license_expiration_status(license_obj)
-        license_obj.update(expiration_status)
-    
-    return licenses
-
 @api_router.get("/client-companies/{company_id}/licenses", response_model=List[License])
 async def list_company_licenses(company_id: str, current_user: dict = Depends(get_current_user)):
     """List all licenses for a client company"""
