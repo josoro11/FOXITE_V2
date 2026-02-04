@@ -552,6 +552,68 @@ async def seed_database():
     await db.notifications.insert_many(notifications)
     print(f"✓ Created 2 Notifications")
     
+    # 10. Create Sample Saved Views
+    saved_views = [
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "entity_type": "tickets",
+            "name": "My Open High Priority Tickets",
+            "filters": {
+                "priority": "high",
+                "status": "open",
+                "assigned_to": admin_id
+            },
+            "created_by": admin_id,
+            "created_by_name": "Sarah Admin",
+            "is_shared": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "entity_type": "tickets",
+            "name": "All Urgent Tickets (Shared)",
+            "filters": {
+                "priority": "urgent"
+            },
+            "created_by": admin_id,
+            "created_by_name": "Sarah Admin",
+            "is_shared": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "entity_type": "tickets",
+            "name": "SLA Breached Tickets",
+            "filters": {
+                "sla_breached_resolution": True
+            },
+            "created_by": supervisor_id,
+            "created_by_name": "Mike Supervisor",
+            "is_shared": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "organization_id": org_id,
+            "entity_type": "tasks",
+            "name": "Overdue Tasks",
+            "filters": {
+                "completed": False,
+                "due_date_to": datetime.now(timezone.utc).isoformat()
+            },
+            "created_by": admin_id,
+            "created_by_name": "Sarah Admin",
+            "is_shared": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+    ]
+    
+    await db.saved_views.insert_many(saved_views)
+    print(f"✓ Created 4 Saved Views (2 tickets, 1 task, 2 shared)")
+    
     print("\n✅ Database seeding complete!")
     print("\n=== LOGIN CREDENTIALS ===")
     print("SaaS Owner: owner@foxite.com / foxite2025")
