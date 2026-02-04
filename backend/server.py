@@ -2381,6 +2381,472 @@ async def delete_saved_view(view_id: str, current_user: dict = Depends(get_curre
     
     return {"message": "Saved view deleted"}
 
+# ==================== DEVICE ROUTES (ASSET INVENTORY) ====================
+
+@api_router.post("/devices", response_model=Device)
+async def create_device(device_data: DeviceCreate, current_user: dict = Depends(get_current_user)):
+    """Create device asset"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verify company belongs to org
+    company = await db.client_companies.find_one({
+        "id": device_data.client_company_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not company:
+        raise HTTPException(status_code=404, detail="Client company not found")
+    
+    device = Device(
+        organization_id=org_id,
+        client_company_id=device_data.client_company_id,
+        name=device_data.name,
+        device_type=device_data.device_type,
+        manufacturer=device_data.manufacturer,
+        model=device_data.model,
+        serial_number=device_data.serial_number,
+        os_type=device_data.os_type,
+        os_version=device_data.os_version,
+        assigned_to=device_data.assigned_to,
+        status=device_data.status,
+        purchase_date=device_data.purchase_date,
+        warranty_expiry=device_data.warranty_expiry,
+        notes=device_data.notes
+    )
+    
+    doc = device.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    if doc.get('purchase_date'):
+        doc['purchase_date'] = doc['purchase_date'].isoformat()
+    if doc.get('warranty_expiry'):
+        doc['warranty_expiry'] = doc['warranty_expiry'].isoformat()
+    
+    await db.devices.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "CREATE", "device", device.id)
+    
+    return device
+
+@api_router.get("/devices", response_model=List[Device])
+async def list_devices(
+    current_user: dict = Depends(get_current_user),
+    filters: Optional[str] = None
+):
+    """List devices with optional filtering"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {"organization_id": org_id}
+    
+    # Apply filters if provided
+    if filters:
+        try:
+            import json
+            filter_dict = json.loads(filters)
+            
+            if filter_dict.get('status'):
+                query['status'] = filter_dict['status']
+            if filter_dict.get('device_type'):
+                query['device_type'] = filter_dict['device_type']
+            if filter_dict.get('client_company_id'):
+                query['client_company_id'] = filter_dict['client_company_id']
+            if filter_dict.get('assigned_to'):
+                query['assigned_to'] = filter_dict['assigned_to']
+            if filter_dict.get('search'):
+                query['$or'] = [
+                    {'name': {'$regex': filter_dict['search'], '$options': 'i'}},
+                    {'serial_number': {'$regex': filter_dict['search'], '$options': 'i'}}
+                ]
+        except:
+            raise HTTPException(status_code=400, detail="Invalid filter format")
+    
+    devices = await db.devices.find(query, {"_id": 0}).to_list(1000)
+    
+    # Convert datetime strings
+    for device in devices:
+        for field in ['created_at', 'updated_at', 'purchase_date', 'warranty_expiry']:
+            if device.get(field) and isinstance(device[field], str):
+                device[field] = datetime.fromisoformat(device[field])
+    
+    return devices
+
+@api_router.get("/devices/{device_id}", response_model=Device)
+async def get_device(device_id: str, current_user: dict = Depends(get_current_user)):
+    """Get device details"""
+    org_id = current_user.get('organization_id')
+    
+    device = await db.devices.find_one({
+        "id": device_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    # Convert datetime strings
+    for field in ['created_at', 'updated_at', 'purchase_date', 'warranty_expiry']:
+        if device.get(field) and isinstance(device[field], str):
+            device[field] = datetime.fromisoformat(device[field])
+    
+    return device
+
+@api_router.patch("/devices/{device_id}", response_model=Device)
+async def update_device(
+    device_id: str,
+    update_data: DeviceUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update device"""
+    org_id = current_user.get('organization_id')
+    
+    device = await db.devices.find_one({
+        "id": device_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    # Convert datetime fields
+    for field in ['purchase_date', 'warranty_expiry']:
+        if update_dict.get(field) and isinstance(update_dict[field], datetime):
+            update_dict[field] = update_dict[field].isoformat()
+    
+    if update_dict:
+        await db.devices.update_one({"id": device_id}, {"$set": update_dict})
+        await log_audit(org_id, current_user['id'], "UPDATE", "device", device_id)
+    
+    updated_device = await db.devices.find_one({"id": device_id}, {"_id": 0})
+    
+    # Convert datetime strings
+    for field in ['created_at', 'updated_at', 'purchase_date', 'warranty_expiry']:
+        if updated_device.get(field) and isinstance(updated_device[field], str):
+            updated_device[field] = datetime.fromisoformat(updated_device[field])
+    
+    return updated_device
+
+@api_router.delete("/devices/{device_id}")
+async def delete_device(device_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete device"""
+    org_id = current_user.get('organization_id')
+    
+    device = await db.devices.find_one({
+        "id": device_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    await db.devices.delete_one({"id": device_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "device", device_id)
+    
+    return {"message": "Device deleted"}
+
+@api_router.get("/devices/{device_id}/tickets", response_model=List[Ticket])
+async def list_device_tickets(device_id: str, current_user: dict = Depends(get_current_user)):
+    """List all tickets linked to a device"""
+    org_id = current_user.get('organization_id')
+    
+    # Verify device exists
+    device = await db.devices.find_one({
+        "id": device_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    tickets = await db.tickets.find({
+        "device_id": device_id,
+        "organization_id": org_id
+    }, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Convert datetime strings
+    for ticket in tickets:
+        for field in ['created_at', 'updated_at', 'response_due_at', 'resolution_due_at', 'first_response_at']:
+            if ticket.get(field) and isinstance(ticket[field], str):
+                ticket[field] = datetime.fromisoformat(ticket[field])
+    
+    return tickets
+
+@api_router.get("/client-companies/{company_id}/devices", response_model=List[Device])
+async def list_company_devices(company_id: str, current_user: dict = Depends(get_current_user)):
+    """List all devices for a client company"""
+    org_id = current_user.get('organization_id')
+    
+    # Verify company belongs to org
+    company = await db.client_companies.find_one({
+        "id": company_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not company:
+        raise HTTPException(status_code=404, detail="Client company not found")
+    
+    devices = await db.devices.find({
+        "client_company_id": company_id,
+        "organization_id": org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    # Convert datetime strings
+    for device in devices:
+        for field in ['created_at', 'updated_at', 'purchase_date', 'warranty_expiry']:
+            if device.get(field) and isinstance(device[field], str):
+                device[field] = datetime.fromisoformat(device[field])
+    
+    return devices
+
+# ==================== LICENSE ROUTES (ASSET INVENTORY) ====================
+
+@api_router.post("/licenses", response_model=License)
+async def create_license(license_data: LicenseCreate, current_user: dict = Depends(get_current_user)):
+    """Create license/service asset"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Verify company belongs to org
+    company = await db.client_companies.find_one({
+        "id": license_data.client_company_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not company:
+        raise HTTPException(status_code=404, detail="Client company not found")
+    
+    license_obj = License(
+        organization_id=org_id,
+        client_company_id=license_data.client_company_id,
+        name=license_data.name,
+        license_type=license_data.license_type,
+        provider=license_data.provider,
+        license_key=license_data.license_key,
+        assigned_to=license_data.assigned_to,
+        quantity=license_data.quantity,
+        purchase_date=license_data.purchase_date,
+        expiration_date=license_data.expiration_date,
+        renewal_cost=license_data.renewal_cost,
+        billing_cycle=license_data.billing_cycle,
+        status=license_data.status,
+        notes=license_data.notes
+    )
+    
+    doc = license_obj.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    if doc.get('purchase_date'):
+        doc['purchase_date'] = doc['purchase_date'].isoformat()
+    if doc.get('expiration_date'):
+        doc['expiration_date'] = doc['expiration_date'].isoformat()
+    
+    # Calculate expiration status
+    expiration_status = calculate_license_expiration_status(doc)
+    doc.update(expiration_status)
+    
+    await db.licenses.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "CREATE", "license", license_obj.id)
+    
+    # Return with calculated fields
+    license_obj.days_until_expiration = expiration_status['days_until_expiration']
+    license_obj.expiring_soon = expiration_status['expiring_soon']
+    license_obj.expired = expiration_status['expired']
+    
+    return license_obj
+
+@api_router.get("/licenses", response_model=List[License])
+async def list_licenses(
+    current_user: dict = Depends(get_current_user),
+    filters: Optional[str] = None
+):
+    """List licenses with optional filtering"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {"organization_id": org_id}
+    
+    # Apply filters if provided
+    if filters:
+        try:
+            import json
+            filter_dict = json.loads(filters)
+            
+            if filter_dict.get('status'):
+                query['status'] = filter_dict['status']
+            if filter_dict.get('license_type'):
+                query['license_type'] = filter_dict['license_type']
+            if filter_dict.get('client_company_id'):
+                query['client_company_id'] = filter_dict['client_company_id']
+            if filter_dict.get('expiring_soon') is not None:
+                query['expiring_soon'] = filter_dict['expiring_soon']
+            if filter_dict.get('expired') is not None:
+                query['expired'] = filter_dict['expired']
+            if filter_dict.get('search'):
+                query['$or'] = [
+                    {'name': {'$regex': filter_dict['search'], '$options': 'i'}},
+                    {'provider': {'$regex': filter_dict['search'], '$options': 'i'}}
+                ]
+        except:
+            raise HTTPException(status_code=400, detail="Invalid filter format")
+    
+    licenses = await db.licenses.find(query, {"_id": 0}).to_list(1000)
+    
+    # Convert datetime strings and calculate expiration status
+    for license_obj in licenses:
+        for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
+            if license_obj.get(field) and isinstance(license_obj[field], str):
+                license_obj[field] = datetime.fromisoformat(license_obj[field])
+        
+        # Recalculate expiration status
+        expiration_status = calculate_license_expiration_status(license_obj)
+        license_obj.update(expiration_status)
+    
+    return licenses
+
+@api_router.get("/licenses/{license_id}", response_model=License)
+async def get_license(license_id: str, current_user: dict = Depends(get_current_user)):
+    """Get license details"""
+    org_id = current_user.get('organization_id')
+    
+    license_obj = await db.licenses.find_one({
+        "id": license_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not license_obj:
+        raise HTTPException(status_code=404, detail="License not found")
+    
+    # Convert datetime strings
+    for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
+        if license_obj.get(field) and isinstance(license_obj[field], str):
+            license_obj[field] = datetime.fromisoformat(license_obj[field])
+    
+    # Recalculate expiration status
+    expiration_status = calculate_license_expiration_status(license_obj)
+    license_obj.update(expiration_status)
+    
+    return license_obj
+
+@api_router.patch("/licenses/{license_id}", response_model=License)
+async def update_license(
+    license_id: str,
+    update_data: LicenseUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update license"""
+    org_id = current_user.get('organization_id')
+    
+    license_obj = await db.licenses.find_one({
+        "id": license_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not license_obj:
+        raise HTTPException(status_code=404, detail="License not found")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    # Convert datetime fields
+    for field in ['purchase_date', 'expiration_date']:
+        if update_dict.get(field) and isinstance(update_dict[field], datetime):
+            update_dict[field] = update_dict[field].isoformat()
+    
+    if update_dict:
+        await db.licenses.update_one({"id": license_id}, {"$set": update_dict})
+        await log_audit(org_id, current_user['id'], "UPDATE", "license", license_id)
+    
+    updated_license = await db.licenses.find_one({"id": license_id}, {"_id": 0})
+    
+    # Convert datetime strings
+    for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
+        if updated_license.get(field) and isinstance(updated_license[field], str):
+            updated_license[field] = datetime.fromisoformat(updated_license[field])
+    
+    # Recalculate expiration status
+    expiration_status = calculate_license_expiration_status(updated_license)
+    updated_license.update(expiration_status)
+    
+    return updated_license
+
+@api_router.delete("/licenses/{license_id}")
+async def delete_license(license_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete license"""
+    org_id = current_user.get('organization_id')
+    
+    license_obj = await db.licenses.find_one({
+        "id": license_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not license_obj:
+        raise HTTPException(status_code=404, detail="License not found")
+    
+    await db.licenses.delete_one({"id": license_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "license", license_id)
+    
+    return {"message": "License deleted"}
+
+@api_router.get("/licenses/expiring", response_model=List[License])
+async def list_expiring_licenses(current_user: dict = Depends(get_current_user)):
+    """List licenses expiring soon (shortcut endpoint)"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    licenses = await db.licenses.find({
+        "organization_id": org_id,
+        "expiring_soon": True
+    }, {"_id": 0}).to_list(1000)
+    
+    # Convert datetime strings and recalculate
+    for license_obj in licenses:
+        for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
+            if license_obj.get(field) and isinstance(license_obj[field], str):
+                license_obj[field] = datetime.fromisoformat(license_obj[field])
+        
+        expiration_status = calculate_license_expiration_status(license_obj)
+        license_obj.update(expiration_status)
+    
+    return licenses
+
+@api_router.get("/client-companies/{company_id}/licenses", response_model=List[License])
+async def list_company_licenses(company_id: str, current_user: dict = Depends(get_current_user)):
+    """List all licenses for a client company"""
+    org_id = current_user.get('organization_id')
+    
+    # Verify company belongs to org
+    company = await db.client_companies.find_one({
+        "id": company_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not company:
+        raise HTTPException(status_code=404, detail="Client company not found")
+    
+    licenses = await db.licenses.find({
+        "client_company_id": company_id,
+        "organization_id": org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    # Convert datetime strings and calculate expiration
+    for license_obj in licenses:
+        for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
+            if license_obj.get(field) and isinstance(license_obj[field], str):
+                license_obj[field] = datetime.fromisoformat(license_obj[field])
+        
+        expiration_status = calculate_license_expiration_status(license_obj)
+        license_obj.update(expiration_status)
+    
+    return licenses
+
 # ==================== TASK ROUTES ====================
 
 @api_router.post("/tasks", response_model=Task)
