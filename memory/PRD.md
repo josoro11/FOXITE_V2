@@ -16,19 +16,25 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - **Supervisor:** Team supervisor
 - **Technician:** Support staff
 
-## Subscription Plans
-| Feature | CORE ($25) | PLUS ($55) | PRIME ($90) |
-|---------|------------|------------|-------------|
-| Staff Users | 3 | 10 | Unlimited |
-| Tickets | ✓ | ✓ | ✓ |
-| Devices Inventory | ✓ | ✓ | ✓ |
+## Subscription Plans (Phase 3B - Enforced)
+| Resource/Feature | CORE ($25) | PLUS ($55) | PRIME ($90) |
+|------------------|------------|------------|-------------|
+| **Tickets** | Unlimited | Unlimited | Unlimited |
+| **Staff Users** | Unlimited | Unlimited | Unlimited |
+| **End Users** | Unlimited | Unlimited | Unlimited |
+| **Devices** | 25 | 100 | Unlimited |
+| **Licenses** | ✗ (0) | 50 | Unlimited |
+| **Saved Views** | ✗ (5)* | 25 | Unlimited |
+| **Automations** | ✗ (0) | 10 | Unlimited |
+| **AI Requests/mo** | ✗ (0) | 100 | Unlimited |
 | Licenses Inventory | ✗ | ✓ | ✓ |
-| SLA Management | Basic | Advanced | Advanced |
-| AI Features | ✗ | Limited | Unlimited |
-| Workflows | ✗ | ✓ | ✓ |
 | Saved Filters | ✗ | ✓ | ✓ |
+| Workflows | ✗ | ✓ | ✓ |
+| AI Features | ✗ | Limited | Unlimited |
 | Custom Dashboards | ✗ | ✗ | ✓ |
 | Audit Logs | ✗ | ✗ | ✓ |
+
+*CORE plan has some saved views from before enforcement was added
 
 ## Implemented Features
 
@@ -37,7 +43,6 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - JWT authentication with role-based access
 - Staff users, end users, client companies
 - Subscription and plan management
-- Feature gating system (structure only, not enforced)
 
 ### Phase 2A: Enhanced Tickets (✅ Complete)
 - Auto-incrementing ticket numbers per organization
