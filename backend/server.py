@@ -948,6 +948,35 @@ async def check_sla_breach(ticket: dict):
     if updates:
         await db.tickets.update_one({"id": ticket['id']}, {"$set": updates})
 
+def calculate_license_expiration_status(license: dict) -> dict:
+    """Calculate expiration status for a license (data only, no alerts)"""
+    expiration_date = license.get('expiration_date')
+    
+    if not expiration_date:
+        return {
+            'days_until_expiration': None,
+            'expiring_soon': False,
+            'expired': False
+        }
+    
+    # Convert to datetime if string
+    if isinstance(expiration_date, str):
+        expiration_date = datetime.fromisoformat(expiration_date.replace('Z', '+00:00'))
+    
+    # Ensure timezone aware
+    if expiration_date.tzinfo is None:
+        expiration_date = expiration_date.replace(tzinfo=timezone.utc)
+    
+    now = datetime.now(timezone.utc)
+    delta = expiration_date - now
+    days_until = delta.days
+    
+    return {
+        'days_until_expiration': days_until,
+        'expiring_soon': days_until < 60 and days_until >= 0,
+        'expired': days_until < 0
+    }
+
 def parse_filters(filters: dict, entity_type: str) -> dict:
     """Parse filter parameters into MongoDB query"""
     query = {}
