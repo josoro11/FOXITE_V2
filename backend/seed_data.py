@@ -268,6 +268,222 @@ async def seed_database():
     await db.end_users.insert_many(end_users)
     print(f"✓ Created 8 End Users")
     
+    # 5a. Create Devices
+    device1_id = str(uuid.uuid4())  # Active laptop linked to ticket
+    device2_id = str(uuid.uuid4())  # Active server
+    device3_id = str(uuid.uuid4())  # Maintenance printer (linked to ticket 2)
+    device4_id = str(uuid.uuid4())  # Retired laptop
+    device5_id = str(uuid.uuid4())  # Active laptop for CEO (linked to ticket 5)
+    
+    devices = [
+        {
+            "id": device1_id,
+            "organization_id": org_id,
+            "client_company_id": company1_id,
+            "name": "Marketing Team Laptop 01",
+            "device_type": "laptop",
+            "manufacturer": "Dell",
+            "model": "XPS 15 9520",
+            "serial_number": "DXPS15-2023-001",
+            "os_type": "Windows",
+            "os_version": "11 Pro",
+            "assigned_to": end_users[0]["id"],
+            "status": "active",
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=365)).isoformat(),
+            "warranty_expiry": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
+            "notes": "Marketing department laptop with Adobe suite installed",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": device2_id,
+            "organization_id": org_id,
+            "client_company_id": company1_id,
+            "name": "Acme Web Server",
+            "device_type": "server",
+            "manufacturer": "HP",
+            "model": "ProLiant DL380 Gen10",
+            "serial_number": "HPDL380-2022-001",
+            "os_type": "Linux",
+            "os_version": "Ubuntu Server 22.04 LTS",
+            "assigned_to": None,
+            "status": "active",
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=730)).isoformat(),
+            "warranty_expiry": (datetime.now(timezone.utc) + timedelta(days=95)).isoformat(),
+            "notes": "Primary web server for Acme Corporation",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": device3_id,
+            "organization_id": org_id,
+            "client_company_id": company1_id,
+            "name": "3rd Floor Network Printer",
+            "device_type": "printer",
+            "manufacturer": "HP",
+            "model": "LaserJet Enterprise MFP M636",
+            "serial_number": "HPLJ-3FL-2021-001",
+            "os_type": None,
+            "os_version": None,
+            "assigned_to": None,
+            "status": "maintenance",
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=1095)).isoformat(),
+            "warranty_expiry": (datetime.now(timezone.utc) - timedelta(days=365)).isoformat(),
+            "notes": "Network printer - currently experiencing connectivity issues",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": device4_id,
+            "organization_id": org_id,
+            "client_company_id": company2_id,
+            "name": "Old Finance Laptop",
+            "device_type": "laptop",
+            "manufacturer": "Lenovo",
+            "model": "ThinkPad T480",
+            "serial_number": "LNV-T480-2019-001",
+            "os_type": "Windows",
+            "os_version": "10 Pro",
+            "assigned_to": None,
+            "status": "retired",
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=1825)).isoformat(),
+            "warranty_expiry": (datetime.now(timezone.utc) - timedelta(days=730)).isoformat(),
+            "notes": "Retired device - replaced with newer model",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": device5_id,
+            "organization_id": org_id,
+            "client_company_id": company3_id,
+            "name": "CEO Executive Laptop",
+            "device_type": "laptop",
+            "manufacturer": "Apple",
+            "model": "MacBook Pro 16-inch M3 Max",
+            "serial_number": "APL-MBP-2024-CEO",
+            "os_type": "macOS",
+            "os_version": "Sonoma 14.4",
+            "assigned_to": end_users[6]["id"],
+            "status": "active",
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=90)).isoformat(),
+            "warranty_expiry": (datetime.now(timezone.utc) + timedelta(days=640)).isoformat(),
+            "notes": "Executive laptop experiencing performance issues",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+    ]
+    
+    await db.devices.insert_many(devices)
+    print(f"✓ Created 5 Devices (laptop, server, printer - active, maintenance, retired)")
+    
+    # 5b. Create Licenses
+    license1_id = str(uuid.uuid4())  # Active license
+    license2_id = str(uuid.uuid4())  # Expiring soon (within 60 days)
+    license3_id = str(uuid.uuid4())  # Already expired
+    license4_id = str(uuid.uuid4())  # Active subscription
+    license5_id = str(uuid.uuid4())  # Expiring very soon (within 5 days)
+    
+    licenses = [
+        {
+            "id": license1_id,
+            "organization_id": org_id,
+            "client_company_id": company1_id,
+            "name": "Microsoft 365 Business Premium",
+            "license_type": "subscription",
+            "provider": "Microsoft",
+            "license_key": "M365-ACME-2024-XXXXX",
+            "assigned_to": None,
+            "quantity": 50,
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=180)).isoformat(),
+            "expiration_date": (datetime.now(timezone.utc) + timedelta(days=185)).isoformat(),
+            "renewal_cost": 1250.00,
+            "billing_cycle": "yearly",
+            "status": "active",
+            "notes": "Company-wide Microsoft 365 license",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": license2_id,
+            "organization_id": org_id,
+            "client_company_id": company1_id,
+            "name": "Antivirus Enterprise Suite",
+            "license_type": "software",
+            "provider": "Norton",
+            "license_key": "NRT-ENT-2023-XXXXX",
+            "assigned_to": None,
+            "quantity": 100,
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=330)).isoformat(),
+            "expiration_date": (datetime.now(timezone.utc) + timedelta(days=35)).isoformat(),
+            "renewal_cost": 2500.00,
+            "billing_cycle": "yearly",
+            "status": "active",
+            "notes": "Enterprise antivirus - expiring soon",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": license3_id,
+            "organization_id": org_id,
+            "client_company_id": company2_id,
+            "name": "Adobe Creative Cloud (Expired)",
+            "license_type": "subscription",
+            "provider": "Adobe",
+            "license_key": "ADO-CC-2022-XXXXX",
+            "assigned_to": end_users[4]["id"],
+            "quantity": 5,
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=400)).isoformat(),
+            "expiration_date": (datetime.now(timezone.utc) - timedelta(days=35)).isoformat(),
+            "renewal_cost": 450.00,
+            "billing_cycle": "monthly",
+            "status": "expired",
+            "notes": "License has expired - needs renewal",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": license4_id,
+            "organization_id": org_id,
+            "client_company_id": company2_id,
+            "name": "Slack Business+",
+            "license_type": "subscription",
+            "provider": "Slack",
+            "license_key": "SLK-BUS-2024-XXXXX",
+            "assigned_to": None,
+            "quantity": 25,
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=60)).isoformat(),
+            "expiration_date": (datetime.now(timezone.utc) + timedelta(days=305)).isoformat(),
+            "renewal_cost": 187.50,
+            "billing_cycle": "monthly",
+            "status": "active",
+            "notes": "Team communication platform",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": license5_id,
+            "organization_id": org_id,
+            "client_company_id": company2_id,
+            "name": "Adobe Creative Cloud (Expiring)",
+            "license_type": "subscription",
+            "provider": "Adobe",
+            "license_key": "ADO-CC-2024-XXXXX",
+            "assigned_to": end_users[4]["id"],
+            "quantity": 5,
+            "purchase_date": (datetime.now(timezone.utc) - timedelta(days=360)).isoformat(),
+            "expiration_date": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat(),
+            "renewal_cost": 450.00,
+            "billing_cycle": "monthly",
+            "status": "active",
+            "notes": "Marketing team Adobe license - expiring in 5 days!",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+    ]
+    
+    await db.licenses.insert_many(licenses)
+    print(f"✓ Created 5 Licenses (active, expiring soon, expired)")
+    
     # 6. Create Tickets
     tickets = [
         {
