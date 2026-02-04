@@ -2671,6 +2671,7 @@ async def list_licenses(
         raise HTTPException(status_code=403, detail="Access denied")
     
     query = {"organization_id": org_id}
+    post_filters = {}  # Filters to apply after calculation
     
     # Apply filters if provided
     if filters:
@@ -2684,10 +2685,11 @@ async def list_licenses(
                 query['license_type'] = filter_dict['license_type']
             if filter_dict.get('client_company_id'):
                 query['client_company_id'] = filter_dict['client_company_id']
+            # These are calculated fields - filter after fetching
             if filter_dict.get('expiring_soon') is not None:
-                query['expiring_soon'] = filter_dict['expiring_soon']
+                post_filters['expiring_soon'] = filter_dict['expiring_soon']
             if filter_dict.get('expired') is not None:
-                query['expired'] = filter_dict['expired']
+                post_filters['expired'] = filter_dict['expired']
             if filter_dict.get('search'):
                 query['$or'] = [
                     {'name': {'$regex': filter_dict['search'], '$options': 'i'}},
@@ -2699,6 +2701,7 @@ async def list_licenses(
     licenses = await db.licenses.find(query, {"_id": 0}).to_list(1000)
     
     # Convert datetime strings and calculate expiration status
+    result = []
     for license_obj in licenses:
         for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
             if license_obj.get(field) and isinstance(license_obj[field], str):
@@ -2707,8 +2710,20 @@ async def list_licenses(
         # Recalculate expiration status
         expiration_status = calculate_license_expiration_status(license_obj)
         license_obj.update(expiration_status)
+        
+        # Apply post-fetch filters on calculated fields
+        if post_filters:
+            include = True
+            if 'expiring_soon' in post_filters and license_obj.get('expiring_soon') != post_filters['expiring_soon']:
+                include = False
+            if 'expired' in post_filters and license_obj.get('expired') != post_filters['expired']:
+                include = False
+            if include:
+                result.append(license_obj)
+        else:
+            result.append(license_obj)
     
-    return licenses
+    return result
 
 @api_router.get("/licenses/expiring", response_model=List[License])
 async def list_expiring_licenses(current_user: dict = Depends(get_current_user)):
