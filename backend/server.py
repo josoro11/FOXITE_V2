@@ -1474,22 +1474,39 @@ async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(
     return updated_ticket
 
 @api_router.get("/tickets", response_model=List[Ticket])
-async def list_tickets(current_user: dict = Depends(get_current_user)):
+async def list_tickets(
+    current_user: dict = Depends(get_current_user),
+    filters: Optional[str] = None
+):
+    """List tickets with optional filtering"""
     org_id = current_user.get('organization_id')
     if not org_id:
         raise HTTPException(status_code=403, detail="SaaS Owners must specify organization")
     
+    # Base query with multi-tenant isolation
     query = {"organization_id": org_id}
+    
+    # Apply role-based filtering
     if current_user.get('role') == UserRole.TECHNICIAN:
         query["assigned_staff_id"] = current_user['id']
     
+    # Parse and apply filters if provided
+    if filters:
+        try:
+            import json
+            filter_dict = json.loads(filters)
+            filter_query = parse_filters(filter_dict, 'tickets')
+            query.update(filter_query)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid filter format")
+    
     tickets = await db.tickets.find(query, {"_id": 0}).to_list(1000)
     
+    # Convert datetime strings
     for ticket in tickets:
-        if isinstance(ticket.get('created_at'), str):
-            ticket['created_at'] = datetime.fromisoformat(ticket['created_at'])
-        if isinstance(ticket.get('updated_at'), str):
-            ticket['updated_at'] = datetime.fromisoformat(ticket['updated_at'])
+        for field in ['created_at', 'updated_at', 'response_due_at', 'resolution_due_at', 'first_response_at']:
+            if ticket.get(field) and isinstance(ticket[field], str):
+                ticket[field] = datetime.fromisoformat(ticket[field])
     
     return tickets
 
