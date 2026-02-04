@@ -2768,6 +2768,12 @@ async def create_license(license_data: LicenseCreate, current_user: dict = Depen
     if not org_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # PLAN ENFORCEMENT: Check feature access (licenses not available on CORE)
+    await enforce_feature_access(org_id, "licenses_inventory", required_plan="PLUS")
+    
+    # PLAN ENFORCEMENT: Check license limit
+    await enforce_resource_limit(org_id, "licenses")
+    
     # Verify company belongs to org
     company = await db.client_companies.find_one({
         "id": license_data.client_company_id,
