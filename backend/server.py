@@ -2105,17 +2105,35 @@ async def create_task(task_data: TaskCreate, current_user: dict = Depends(get_cu
     return task
 
 @api_router.get("/tasks", response_model=List[Task])
-async def list_tasks(current_user: dict = Depends(get_current_user)):
+async def list_tasks(
+    current_user: dict = Depends(get_current_user),
+    filters: Optional[str] = None
+):
+    """List tasks with optional filtering"""
     org_id = current_user.get('organization_id')
     if not org_id:
         raise HTTPException(status_code=403, detail="SaaS Owners must specify organization")
     
+    # Base query with multi-tenant isolation
     query = {"organization_id": org_id}
+    
+    # Apply role-based filtering
     if current_user.get('role') == UserRole.TECHNICIAN:
         query["assigned_staff_id"] = current_user['id']
     
+    # Parse and apply filters if provided
+    if filters:
+        try:
+            import json
+            filter_dict = json.loads(filters)
+            filter_query = parse_filters(filter_dict, 'tasks')
+            query.update(filter_query)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid filter format")
+    
     tasks = await db.tasks.find(query, {"_id": 0}).to_list(1000)
     
+    # Convert datetime strings
     for task in tasks:
         if isinstance(task.get('created_at'), str):
             task['created_at'] = datetime.fromisoformat(task['created_at'])
