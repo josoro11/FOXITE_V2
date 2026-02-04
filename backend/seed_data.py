@@ -498,7 +498,7 @@ async def seed_database():
             "assigned_staff_id": tech1_id,
             "requester_id": end_users[0]["id"],
             "client_company_id": company1_id,
-            "device_id": None,
+            "device_id": device1_id,  # Linked to Marketing Team Laptop
             "created_at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
             "updated_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         },
@@ -514,7 +514,7 @@ async def seed_database():
             "assigned_staff_id": tech2_id,
             "requester_id": end_users[1]["id"],
             "client_company_id": company1_id,
-            "device_id": None,
+            "device_id": device3_id,  # Linked to 3rd Floor Network Printer
             "created_at": (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat(),
             "updated_at": (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
         },
