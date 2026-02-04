@@ -498,6 +498,30 @@ class BusinessHoursCreate(BaseModel):
     start_time: str = "09:00"
     end_time: str = "17:00"
 
+# Saved View Models
+class SavedView(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    entity_type: str  # "tickets", "tasks", "sessions"
+    name: str
+    filters: dict  # JSON filter configuration
+    created_by: str
+    created_by_name: str  # Denormalized
+    is_shared: bool = False  # Shared with organization
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SavedViewCreate(BaseModel):
+    entity_type: str
+    name: str
+    filters: dict
+    is_shared: bool = False
+
+class SavedViewUpdate(BaseModel):
+    name: Optional[str] = None
+    filters: Optional[dict] = None
+    is_shared: Optional[bool] = None
+
 # Task Models
 class Task(BaseModel):
     model_config = ConfigDict(extra="ignore")
