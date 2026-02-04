@@ -2543,6 +2543,9 @@ async def create_device(device_data: DeviceCreate, current_user: dict = Depends(
     if not org_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # PLAN ENFORCEMENT: Check device limit
+    await enforce_resource_limit(org_id, "devices")
+    
     # Verify company belongs to org
     company = await db.client_companies.find_one({
         "id": device_data.client_company_id,
