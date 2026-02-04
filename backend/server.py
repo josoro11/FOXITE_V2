@@ -2112,6 +2112,143 @@ async def get_business_hours(current_user: dict = Depends(get_current_user)):
     
     return hours
 
+# ==================== SAVED VIEWS ROUTES ====================
+
+@api_router.post("/saved-views", response_model=SavedView)
+async def create_saved_view(view_data: SavedViewCreate, current_user: dict = Depends(get_current_user)):
+    """Create a saved view/filter"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Validate entity type
+    if view_data.entity_type not in ['tickets', 'tasks', 'sessions']:
+        raise HTTPException(status_code=400, detail="Invalid entity type")
+    
+    view = SavedView(
+        organization_id=org_id,
+        entity_type=view_data.entity_type,
+        name=view_data.name,
+        filters=view_data.filters,
+        created_by=current_user['id'],
+        created_by_name=current_user['name'],
+        is_shared=view_data.is_shared
+    )
+    
+    doc = view.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.saved_views.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "CREATE", "saved_view", view.id)
+    
+    return view
+
+@api_router.get("/saved-views", response_model=List[SavedView])
+async def list_saved_views(
+    current_user: dict = Depends(get_current_user),
+    entity: Optional[str] = None
+):
+    """List saved views, optionally filtered by entity type"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Build query: user's own views OR shared views in organization
+    query = {
+        "organization_id": org_id,
+        "$or": [
+            {"created_by": current_user['id']},
+            {"is_shared": True}
+        ]
+    }
+    
+    # Filter by entity type if provided
+    if entity:
+        if entity not in ['tickets', 'tasks', 'sessions']:
+            raise HTTPException(status_code=400, detail="Invalid entity type")
+        query["entity_type"] = entity
+    
+    views = await db.saved_views.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Convert datetime strings
+    for view in views:
+        if isinstance(view.get('created_at'), str):
+            view['created_at'] = datetime.fromisoformat(view['created_at'])
+    
+    return views
+
+@api_router.get("/saved-views/{view_id}", response_model=SavedView)
+async def get_saved_view(view_id: str, current_user: dict = Depends(get_current_user)):
+    """Get specific saved view"""
+    org_id = current_user.get('organization_id')
+    
+    view = await db.saved_views.find_one({
+        "id": view_id,
+        "organization_id": org_id
+    }, {"_id": 0})
+    
+    if not view:
+        raise HTTPException(status_code=404, detail="Saved view not found")
+    
+    # Check access: must be creator or view must be shared
+    if view['created_by'] != current_user['id'] and not view.get('is_shared'):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if isinstance(view.get('created_at'), str):
+        view['created_at'] = datetime.fromisoformat(view['created_at'])
+    
+    return view
+
+@api_router.patch("/saved-views/{view_id}", response_model=SavedView)
+async def update_saved_view(
+    view_id: str,
+    update_data: SavedViewUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update saved view"""
+    org_id = current_user.get('organization_id')
+    
+    view = await db.saved_views.find_one({
+        "id": view_id,
+        "organization_id": org_id,
+        "created_by": current_user['id']
+    }, {"_id": 0})
+    
+    if not view:
+        raise HTTPException(status_code=404, detail="Saved view not found or access denied")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    
+    if update_dict:
+        await db.saved_views.update_one({"id": view_id}, {"$set": update_dict})
+        await log_audit(org_id, current_user['id'], "UPDATE", "saved_view", view_id)
+    
+    updated_view = await db.saved_views.find_one({"id": view_id}, {"_id": 0})
+    
+    if isinstance(updated_view.get('created_at'), str):
+        updated_view['created_at'] = datetime.fromisoformat(updated_view['created_at'])
+    
+    return updated_view
+
+@api_router.delete("/saved-views/{view_id}")
+async def delete_saved_view(view_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete saved view"""
+    org_id = current_user.get('organization_id')
+    
+    view = await db.saved_views.find_one({
+        "id": view_id,
+        "organization_id": org_id,
+        "created_by": current_user['id']
+    }, {"_id": 0})
+    
+    if not view:
+        raise HTTPException(status_code=404, detail="Saved view not found or access denied")
+    
+    await db.saved_views.delete_one({"id": view_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "saved_view", view_id)
+    
+    return {"message": "Saved view deleted"}
+
 # ==================== TASK ROUTES ====================
 
 @api_router.post("/tasks", response_model=Task)
