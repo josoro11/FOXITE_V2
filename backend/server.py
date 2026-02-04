@@ -1902,6 +1902,46 @@ async def list_agent_sessions(agent_id: str, current_user: dict = Depends(get_cu
     
     return sessions
 
+@api_router.get("/sessions", response_model=List[Session])
+async def list_sessions(
+    current_user: dict = Depends(get_current_user),
+    filters: Optional[str] = None
+):
+    """List all sessions with optional filtering"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Base query with multi-tenant isolation
+    query = {"organization_id": org_id}
+    
+    # Technicians only see their own sessions
+    if current_user.get('role') == UserRole.TECHNICIAN:
+        query["agent_id"] = current_user['id']
+    
+    # Parse and apply filters if provided
+    if filters:
+        try:
+            import json
+            filter_dict = json.loads(filters)
+            filter_query = parse_filters(filter_dict, 'sessions')
+            query.update(filter_query)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid filter format")
+    
+    sessions = await db.sessions.find(query, {"_id": 0}).sort("start_time", -1).to_list(1000)
+    
+    # Convert datetime strings
+    for session in sessions:
+        if isinstance(session.get('start_time'), str):
+            session['start_time'] = datetime.fromisoformat(session['start_time'])
+        if session.get('end_time') and isinstance(session.get('end_time'), str):
+            session['end_time'] = datetime.fromisoformat(session['end_time'])
+        if isinstance(session.get('created_at'), str):
+            session['created_at'] = datetime.fromisoformat(session['created_at'])
+    
+    return sessions
+
 # ==================== SLA POLICY ROUTES ====================
 
 @api_router.post("/sla-policies", response_model=SLAPolicy)
