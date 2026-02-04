@@ -231,16 +231,92 @@ async def can_use_feature(org_id: str, feature_name: str) -> bool:
         return False
 
 async def check_staff_limit(org_id: str) -> bool:
-    """Check if organization can add more staff users"""
-    plan_limits = await get_plan_limits(org_id)
-    max_staff = plan_limits.get("max_staff_users", 3)
+    """Check if organization can add more staff users - ALWAYS TRUE (unlimited)"""
+    # Staff users are unlimited on all plans
+    return True
+
+async def get_resource_limit(org_id: str, resource: str) -> Optional[int]:
+    """Get the limit for a specific resource (None = unlimited)"""
+    plan = await get_plan_limits(org_id)
+    return plan.get("limits", {}).get(resource, None)
+
+async def get_current_resource_count(org_id: str, resource: str) -> int:
+    """Get current count of a resource for an organization"""
+    collection_map = {
+        "devices": "devices",
+        "licenses": "licenses",
+        "saved_views": "saved_views",
+        "staff_users": "staff_users",
+        "automations": "automation_rules",  # Future collection
+    }
     
-    current_staff = await db.staff_users.count_documents({
-        "organization_id": org_id,
-        "status": "active"
-    })
+    collection_name = collection_map.get(resource)
+    if not collection_name:
+        return 0
     
-    return current_staff < max_staff
+    # Check if collection exists
+    collection = db[collection_name]
+    count = await collection.count_documents({"organization_id": org_id})
+    return count
+
+async def check_resource_limit(org_id: str, resource: str) -> Dict[str, Any]:
+    """
+    Check if organization can add more of a resource.
+    Returns dict with: can_add (bool), current (int), limit (int or None), plan (str)
+    """
+    plan = await get_plan_limits(org_id)
+    plan_name = plan.get("name", "CORE")
+    limit = plan.get("limits", {}).get(resource, None)
+    current = await get_current_resource_count(org_id, resource)
+    
+    # None means unlimited
+    can_add = limit is None or current < limit
+    
+    return {
+        "can_add": can_add,
+        "current": current,
+        "limit": limit,
+        "plan": plan_name,
+        "unlimited": limit is None
+    }
+
+async def enforce_resource_limit(org_id: str, resource: str):
+    """
+    Enforce resource limit - raises PlanLimitError if limit exceeded.
+    Call this before creating a new resource.
+    """
+    result = await check_resource_limit(org_id, resource)
+    
+    if not result["can_add"]:
+        raise PlanLimitError(
+            resource=resource,
+            limit=result["limit"],
+            plan=result["plan"]
+        )
+
+async def enforce_feature_access(org_id: str, feature: str, required_plan: str = "PLUS"):
+    """
+    Enforce feature access - raises FeatureNotAvailableError if not available.
+    Call this before accessing a gated feature.
+    """
+    plan = await get_plan_limits(org_id)
+    plan_name = plan.get("name", "CORE")
+    
+    if not await can_use_feature(org_id, feature):
+        raise FeatureNotAvailableError(
+            feature=feature,
+            plan=plan_name,
+            required_plan=required_plan
+        )
+
+def get_minimum_plan_for_feature(feature: str) -> str:
+    """Get the minimum plan required for a feature"""
+    for plan_name in ["CORE", "PLUS", "PRIME"]:
+        plan = PLAN_FEATURES[plan_name]
+        feature_value = plan["features"].get(feature, False)
+        if feature_value and feature_value != False:
+            return plan_name
+    return "PRIME"  # Default to highest if not found
 
 # ==================== ENUMS ====================
 
