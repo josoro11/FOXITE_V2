@@ -522,6 +522,109 @@ class SavedViewUpdate(BaseModel):
     filters: Optional[dict] = None
     is_shared: Optional[bool] = None
 
+# Device Models (Asset Inventory)
+class Device(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    client_company_id: str
+    name: str
+    device_type: str  # laptop, server, printer, network, mobile, other
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    os_type: Optional[str] = None
+    os_version: Optional[str] = None
+    assigned_to: Optional[str] = None  # end_user_id
+    status: str = "active"  # active, maintenance, retired, disposed
+    purchase_date: Optional[datetime] = None
+    warranty_expiry: Optional[datetime] = None
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class DeviceCreate(BaseModel):
+    client_company_id: str
+    name: str
+    device_type: str
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    os_type: Optional[str] = None
+    os_version: Optional[str] = None
+    assigned_to: Optional[str] = None
+    status: str = "active"
+    purchase_date: Optional[datetime] = None
+    warranty_expiry: Optional[datetime] = None
+    notes: Optional[str] = None
+
+class DeviceUpdate(BaseModel):
+    name: Optional[str] = None
+    device_type: Optional[str] = None
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    os_type: Optional[str] = None
+    os_version: Optional[str] = None
+    assigned_to: Optional[str] = None
+    status: Optional[str] = None
+    purchase_date: Optional[datetime] = None
+    warranty_expiry: Optional[datetime] = None
+    notes: Optional[str] = None
+
+# License Models (Asset Inventory)
+class License(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    client_company_id: str
+    name: str
+    license_type: str  # software, service, subscription, other
+    provider: Optional[str] = None
+    license_key: Optional[str] = None
+    assigned_to: Optional[str] = None  # end_user_id
+    quantity: int = 1
+    purchase_date: Optional[datetime] = None
+    expiration_date: Optional[datetime] = None
+    renewal_cost: Optional[float] = None
+    billing_cycle: Optional[str] = None  # monthly, yearly, one-time
+    status: str = "active"  # active, expired, cancelled
+    days_until_expiration: Optional[int] = None  # Calculated field
+    expiring_soon: bool = False  # Calculated: < 60 days
+    expired: bool = False  # Calculated: past expiration
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class LicenseCreate(BaseModel):
+    client_company_id: str
+    name: str
+    license_type: str
+    provider: Optional[str] = None
+    license_key: Optional[str] = None
+    assigned_to: Optional[str] = None
+    quantity: int = 1
+    purchase_date: Optional[datetime] = None
+    expiration_date: Optional[datetime] = None
+    renewal_cost: Optional[float] = None
+    billing_cycle: Optional[str] = None
+    status: str = "active"
+    notes: Optional[str] = None
+
+class LicenseUpdate(BaseModel):
+    name: Optional[str] = None
+    license_type: Optional[str] = None
+    provider: Optional[str] = None
+    license_key: Optional[str] = None
+    assigned_to: Optional[str] = None
+    quantity: Optional[int] = None
+    purchase_date: Optional[datetime] = None
+    expiration_date: Optional[datetime] = None
+    renewal_cost: Optional[float] = None
+    billing_cycle: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
 # Task Models
 class Task(BaseModel):
     model_config = ConfigDict(extra="ignore")
