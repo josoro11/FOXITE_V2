@@ -562,7 +562,7 @@ async def seed_database():
             "assigned_staff_id": tech2_id,
             "requester_id": end_users[6]["id"],
             "client_company_id": company3_id,
-            "device_id": None,
+            "device_id": device5_id,  # Linked to CEO Executive Laptop
             "created_at": (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat(),
             "updated_at": (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
         },
