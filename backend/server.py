@@ -1585,6 +1585,52 @@ async def get_organization_features(org_id: str, current_user: dict = Depends(ge
     plan_limits = await get_plan_limits(org_id)
     return plan_limits
 
+@api_router.get("/organizations/{org_id}/usage")
+async def get_organization_usage(org_id: str, current_user: dict = Depends(get_current_user)):
+    """Get current resource usage vs plan limits for an organization"""
+    if not current_user.get('is_owner') and current_user.get('organization_id') != org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    plan = await get_plan_limits(org_id)
+    plan_name = plan.get("name", "CORE")
+    limits = plan.get("limits", {})
+    
+    # Get current usage for all limited resources
+    usage = {}
+    for resource in ["devices", "licenses", "saved_views", "staff_users"]:
+        current = await get_current_resource_count(org_id, resource)
+        limit = limits.get(resource)
+        usage[resource] = {
+            "current": current,
+            "limit": limit,
+            "unlimited": limit is None,
+            "percentage": round((current / limit) * 100, 1) if limit else 0,
+            "remaining": (limit - current) if limit else None
+        }
+    
+    return {
+        "plan": plan_name,
+        "usage": usage,
+        "features": plan.get("features", {}),
+        "can_upgrade": plan_name != "PRIME"
+    }
+
+@api_router.get("/plans")
+async def get_available_plans():
+    """Get all available subscription plans (public endpoint)"""
+    # Return plan info without internal implementation details
+    plans = []
+    for plan_id, plan in PLAN_FEATURES.items():
+        plans.append({
+            "id": plan_id,
+            "name": plan.get("display_name", plan_id),
+            "price": plan.get("price"),
+            "currency": plan.get("currency", "USD"),
+            "limits": plan.get("limits", {}),
+            "features": plan.get("features", {})
+        })
+    return plans
+
 # ==================== STAFF USER ROUTES ====================
 
 @api_router.get("/staff-users", response_model=List[StaffUser])
