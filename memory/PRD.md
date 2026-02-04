@@ -196,11 +196,35 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 2. **Email Notifications:** Resend integration exists but emails are not sent
 3. **File Storage:** Attachment metadata is stored but no actual file storage
 
+### Phase 3C: Minimal Beta Frontend (✅ Complete - Feb 4, 2026)
+**Authentication & Role Switching:**
+- Login page with quick-login buttons for all roles
+- In-app role switcher (Admin, Supervisor, Technician, Owner)
+- JWT token management with auto-redirect
+
+**Tickets Module:**
+- List view with search, priority/status badges
+- Create ticket modal with device linking option
+- Detail page with full ticket info
+- Status change buttons (new, open, in_progress, on_hold, resolved, closed)
+- Comments/replies with public reply vs internal note toggle
+- Real-time comment display
+
+**End Users Module:**
+- List view with company association
+- Create end user modal with company selection
+
+**Devices Module:**
+- List view with device type, manufacturer, status
+- Create device modal with full fields
+- Plan limit enforcement (shows error on CORE plan limit)
+
+**Companies Module:**
+- Read-only list view of client companies
+
 ## Upcoming Tasks (Backlog)
-- **Phase 3B:** TBD (awaiting user specification)
 - Public website (Home, Features, Pricing)
-- UI polish and frontend implementation
-- Plan enforcement middleware
+- UI polish and enhanced frontend
 - Email notification execution
 - AI module integration
 - Automation & workflows engine
