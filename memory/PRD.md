@@ -85,7 +85,46 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - Dedicated `/licenses/expiring` endpoint
 - Filtering by status, type, expired, expiring_soon
 
+### Phase 3B: Plan Enforcement & Feature Gating (✅ Complete - Feb 4, 2026)
+**Centralized Plan Configuration:**
+- Single source of truth: `PLAN_FEATURES` dict in server.py
+- Three plans: CORE ($25), PLUS ($55), PRIME ($90)
+- Resource limits (devices, licenses, saved_views, automations, AI requests)
+- Feature flags (boolean and tiered)
+
+**Enforcement Middleware:**
+- `enforce_resource_limit(org_id, resource)` - Raises PlanLimitError if limit exceeded
+- `enforce_feature_access(org_id, feature)` - Raises FeatureNotAvailableError if blocked
+- `check_resource_limit(org_id, resource)` - Returns usage info without raising
+
+**Clear Error Responses:**
+```json
+{
+  "error": "plan_limit_exceeded",
+  "resource": "licenses",
+  "limit": 50,
+  "plan": "PLUS",
+  "message": "You have reached the licenses limit (50)...",
+  "upgrade_url": "/settings/billing"
+}
+```
+
+**Feature Flags for Future Modules:**
+- `ai_features`, `ai_ticket_summary`, `ai_response_suggestions`
+- `automation_rules`, `workflows`
+- `custom_dashboards`, `audit_logs`
+
+**Applied Enforcement:**
+- `/api/devices` POST - Device limit check
+- `/api/licenses` POST - Feature + limit check
+- `/api/saved-views` POST - Feature + limit check
+
 ## API Endpoints
+
+### Plans & Usage
+- `GET /api/plans` - List all available plans (public)
+- `GET /api/organizations/{id}/features` - Get plan features
+- `GET /api/organizations/{id}/usage` - Get resource usage vs limits
 
 ### Authentication
 - `POST /api/auth/login` - User login
