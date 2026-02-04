@@ -2406,6 +2406,12 @@ async def create_saved_view(view_data: SavedViewCreate, current_user: dict = Dep
     if not org_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # PLAN ENFORCEMENT: Check feature access (saved_filters not available on CORE)
+    await enforce_feature_access(org_id, "saved_filters", required_plan="PLUS")
+    
+    # PLAN ENFORCEMENT: Check saved views limit
+    await enforce_resource_limit(org_id, "saved_views")
+    
     # Validate entity type
     if view_data.entity_type not in ['tickets', 'tasks', 'sessions']:
         raise HTTPException(status_code=400, detail="Invalid entity type")
