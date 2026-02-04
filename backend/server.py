@@ -42,39 +42,68 @@ app = FastAPI(title="FOXITE API")
 api_router = APIRouter(prefix="/api")
 
 # ==================== PLAN DEFINITIONS ====================
+# Single source of truth for all plan configurations
+# Plans: CORE, PLUS, PRIME (Pro)
 
 PLAN_FEATURES = {
     "CORE": {
         "name": "CORE",
+        "display_name": "Core",
         "price": 25,
         "currency": "USD",
-        "max_staff_users": 3,
+        # Resource limits - None means unlimited
+        "limits": {
+            "staff_users": None,      # Unlimited
+            "tickets": None,          # Unlimited
+            "end_users": None,        # Unlimited
+            "devices": 25,            # Limited to 25 devices
+            "licenses": 0,            # No licenses on Core
+            "saved_views": 5,         # Limited saved views
+            "automations": 0,         # No automations
+            "ai_requests_monthly": 0, # No AI
+        },
+        # Feature flags - True/False or tier string
         "features": {
             "tickets": True,
             "end_users": True,
             "tasks": True,
             "devices_inventory": True,
-            "licenses_inventory": False,
+            "licenses_inventory": False,  # Not available on Core
             "knowledge_base": True,
             "calendar": True,
             "email_notifications": True,
             "ai_features": False,
+            "ai_ticket_summary": False,
+            "ai_response_suggestions": False,
             "sla_management": "basic",
             "reports": "basic",
             "api_access": False,
             "end_user_portal_customization": False,
             "workflows": False,
+            "automation_rules": False,
             "saved_filters": False,
             "custom_dashboards": False,
             "audit_logs": False,
-            "alerts_escalations": "basic"
+            "alerts_escalations": "basic",
+            "time_tracking": True,
+            "asset_linking": True,
         }
     },
     "PLUS": {
         "name": "PLUS",
+        "display_name": "Plus",
         "price": 55,
         "currency": "USD",
-        "max_staff_users": 10,
+        "limits": {
+            "staff_users": None,       # Unlimited
+            "tickets": None,           # Unlimited
+            "end_users": None,         # Unlimited
+            "devices": 100,            # Up to 100 devices
+            "licenses": 50,            # Up to 50 licenses
+            "saved_views": 25,         # More saved views
+            "automations": 10,         # Up to 10 automation rules
+            "ai_requests_monthly": 100, # 100 AI requests/month
+        },
         "features": {
             "tickets": True,
             "end_users": True,
@@ -85,22 +114,37 @@ PLAN_FEATURES = {
             "calendar": True,
             "email_notifications": True,
             "ai_features": "limited",
+            "ai_ticket_summary": True,
+            "ai_response_suggestions": False,
             "sla_management": "advanced",
             "reports": "advanced",
             "api_access": "read_only",
             "end_user_portal_customization": False,
             "workflows": True,
+            "automation_rules": True,
             "saved_filters": True,
             "custom_dashboards": False,
             "audit_logs": False,
-            "alerts_escalations": "advanced"
+            "alerts_escalations": "advanced",
+            "time_tracking": True,
+            "asset_linking": True,
         }
     },
     "PRIME": {
         "name": "PRIME",
+        "display_name": "Prime (Pro)",
         "price": 90,
         "currency": "USD",
-        "max_staff_users": 999999,  # Unlimited
+        "limits": {
+            "staff_users": None,        # Unlimited
+            "tickets": None,            # Unlimited
+            "end_users": None,          # Unlimited
+            "devices": None,            # Unlimited
+            "licenses": None,           # Unlimited
+            "saved_views": None,        # Unlimited
+            "automations": None,        # Unlimited
+            "ai_requests_monthly": None, # Unlimited
+        },
         "features": {
             "tickets": True,
             "end_users": True,
@@ -111,18 +155,51 @@ PLAN_FEATURES = {
             "calendar": True,
             "email_notifications": True,
             "ai_features": "unlimited",
+            "ai_ticket_summary": True,
+            "ai_response_suggestions": True,
             "sla_management": "advanced",
             "reports": "advanced",
             "api_access": "full",
             "end_user_portal_customization": True,
             "workflows": True,
+            "automation_rules": True,
             "saved_filters": True,
             "custom_dashboards": True,
             "audit_logs": True,
-            "alerts_escalations": "advanced"
+            "alerts_escalations": "advanced",
+            "time_tracking": True,
+            "asset_linking": True,
         }
     }
 }
+
+# ==================== PLAN ENFORCEMENT ERRORS ====================
+
+class PlanLimitError(HTTPException):
+    """Custom exception for plan limit violations"""
+    def __init__(self, resource: str, limit: int, plan: str):
+        detail = {
+            "error": "plan_limit_exceeded",
+            "resource": resource,
+            "limit": limit,
+            "plan": plan,
+            "message": f"You have reached the {resource} limit ({limit}) for your {plan} plan. Please upgrade to add more.",
+            "upgrade_url": "/settings/billing"
+        }
+        super().__init__(status_code=403, detail=detail)
+
+class FeatureNotAvailableError(HTTPException):
+    """Custom exception for feature not available on plan"""
+    def __init__(self, feature: str, plan: str, required_plan: str = "PLUS"):
+        detail = {
+            "error": "feature_not_available",
+            "feature": feature,
+            "plan": plan,
+            "required_plan": required_plan,
+            "message": f"The '{feature}' feature is not available on your {plan} plan. Please upgrade to {required_plan} or higher.",
+            "upgrade_url": "/settings/billing"
+        }
+        super().__init__(status_code=403, detail=detail)
 
 # ==================== FEATURE GATING SYSTEM ====================
 
