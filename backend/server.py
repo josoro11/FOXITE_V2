@@ -2710,6 +2710,35 @@ async def list_licenses(
     
     return licenses
 
+@api_router.get("/licenses/expiring", response_model=List[License])
+async def list_expiring_licenses(current_user: dict = Depends(get_current_user)):
+    """List licenses expiring soon (shortcut endpoint)"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Get all licenses and calculate expiration status
+    all_licenses = await db.licenses.find({
+        "organization_id": org_id
+    }, {"_id": 0}).to_list(1000)
+    
+    expiring_licenses = []
+    for license_obj in all_licenses:
+        # Convert datetime strings
+        for field in ['created_at', 'updated_at', 'purchase_date', 'expiration_date']:
+            if license_obj.get(field) and isinstance(license_obj[field], str):
+                license_obj[field] = datetime.fromisoformat(license_obj[field])
+        
+        # Calculate expiration status
+        expiration_status = calculate_license_expiration_status(license_obj)
+        license_obj.update(expiration_status)
+        
+        # Filter for expiring soon (< 60 days and not expired)
+        if expiration_status.get('expiring_soon') and not expiration_status.get('expired'):
+            expiring_licenses.append(license_obj)
+    
+    return expiring_licenses
+
 @api_router.get("/licenses/{license_id}", response_model=License)
 async def get_license(license_id: str, current_user: dict = Depends(get_current_user)):
     """Get license details"""
