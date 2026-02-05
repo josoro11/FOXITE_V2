@@ -1625,16 +1625,23 @@ const CreateTicketModal = ({ onClose, onCreated }) => {
 };
 
 const TicketDetailPage = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const [ticket, setTicket] = useState(null);
   const [comments, setComments] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [commentType, setCommentType] = useState('public_reply');
   const [loading, setLoading] = useState(true);
+  const [activeSession, setActiveSession] = useState(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualDuration, setManualDuration] = useState('');
+  const [manualNote, setManualNote] = useState('');
 
-  useEffect(() => { fetchTicket(); fetchComments(); }, [id]);
+  const canManageTime = user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'technician';
+
+  useEffect(() => { fetchTicket(); fetchComments(); fetchSessions(); }, [id]);
 
   const fetchTicket = async () => {
     try {
@@ -1648,6 +1655,15 @@ const TicketDetailPage = () => {
     try {
       const res = await axios.get(`${API_URL}/tickets/${id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
       setComments(res.data);
+    } catch (e) {}
+  };
+
+  const fetchSessions = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/sessions?ticket_id=${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setSessions(res.data || []);
+      const active = (res.data || []).find(s => !s.end_time);
+      setActiveSession(active || null);
     } catch (e) {}
   };
 
@@ -1668,6 +1684,38 @@ const TicketDetailPage = () => {
       fetchComments();
     } catch (e) { toast.error('Failed'); }
   };
+
+  const startTimer = async () => {
+    try {
+      await axios.post(`${API_URL}/sessions/start`, { ticket_id: id }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Timer started');
+      fetchSessions();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed to start timer'); }
+  };
+
+  const stopTimer = async () => {
+    if (!activeSession) return;
+    try {
+      await axios.post(`${API_URL}/sessions/stop`, { session_id: activeSession.id }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Timer stopped');
+      fetchSessions();
+    } catch (e) { toast.error('Failed to stop timer'); }
+  };
+
+  const addManualEntry = async () => {
+    const mins = parseInt(manualDuration);
+    if (!mins || mins <= 0) { toast.error('Enter valid duration'); return; }
+    try {
+      await axios.post(`${API_URL}/sessions/manual`, { ticket_id: id, duration_minutes: mins, notes: manualNote }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Time entry added');
+      setShowManualEntry(false);
+      setManualDuration('');
+      setManualNote('');
+      fetchSessions();
+    } catch (e) { toast.error('Failed'); }
+  };
+
+  const totalTime = sessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
 
   if (loading || !ticket) return <div className="p-6">Loading...</div>;
 
@@ -1695,6 +1743,66 @@ const TicketDetailPage = () => {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Time Tracking Section */}
+      {canManageTime && (
+        <Card className="mb-4" data-testid="time-tracking-section">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2"><Clock size={18} /> Time Tracking</CardTitle>
+              <Badge variant="outline">{Math.floor(totalTime / 60)}h {totalTime % 60}m total</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4">
+              {activeSession ? (
+                <Button onClick={stopTimer} variant="destructive" size="sm" data-testid="stop-timer-btn">
+                  <StopCircle size={16} className="mr-1" /> Stop Timer
+                </Button>
+              ) : (
+                <Button onClick={startTimer} className="bg-green-600 hover:bg-green-700" size="sm" data-testid="start-timer-btn">
+                  <PlayCircle size={16} className="mr-1" /> Start Timer
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setShowManualEntry(!showManualEntry)} data-testid="manual-entry-btn">
+                <Plus size={16} className="mr-1" /> Manual Entry
+              </Button>
+            </div>
+            {showManualEntry && (
+              <div className="bg-gray-50 p-3 rounded-lg mb-4 flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-gray-600">Duration (minutes)</label>
+                  <Input type="number" value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder="30" className="h-8" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-gray-600">Notes (optional)</label>
+                  <Input value={manualNote} onChange={(e) => setManualNote(e.target.value)} placeholder="Work done..." className="h-8" />
+                </div>
+                <Button size="sm" onClick={addManualEntry} className="bg-orange-500 hover:bg-orange-600">Add</Button>
+              </div>
+            )}
+            {sessions.length > 0 ? (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {sessions.map((s) => (
+                  <div key={s.id} className={`flex items-center justify-between p-2 rounded text-sm ${!s.end_time ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                    <div className="flex items-center gap-2">
+                      {!s.end_time && <span className="animate-pulse w-2 h-2 bg-green-500 rounded-full"></span>}
+                      <span className="text-gray-600">{formatDateTime(s.start_time)}</span>
+                      {s.notes && <span className="text-gray-500">- {s.notes}</span>}
+                    </div>
+                    <Badge variant={!s.end_time ? 'default' : 'secondary'} className={!s.end_time ? 'bg-green-600' : ''}>
+                      {!s.end_time ? 'Running...' : `${s.duration_minutes} min`}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No time entries yet</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader><CardTitle className="text-base">Activity</CardTitle></CardHeader>
         <CardContent>
