@@ -289,13 +289,18 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - **Note:** Email sending requires valid Resend API key (currently using placeholder)
 
 ## Upcoming Tasks (Backlog)
-- Public website (Home, Features, Pricing)
-- UI polish and enhanced frontend
-- Email notification execution
-- AI module integration
-- Automation & workflows engine
+- UI polish and enhanced frontend refactoring
+- AI module integration (ticket summarization, categorization, suggested replies)
+- Automation & workflows engine (Trigger -> Condition -> Action)
 - Advanced reporting/dashboards
 - Payment integration (Stripe)
+- Configure production Resend API key for email notifications
+
+## Known Limitations / Mocked Features
+1. **Email Notifications:** Service is implemented but emails are skipped when using placeholder API key
+2. **File Storage:** Attachment metadata is stored but no actual file storage
+3. **SLA Automations:** Structure + UI v1 only, no advanced SLA breach automations
+4. **Workflows/Automations:** Coming Soon placeholders in Settings UI
 
 ## File Structure
 ```
