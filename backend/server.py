@@ -1235,6 +1235,219 @@ async def send_email_async(recipient: str, subject: str, html: str):
         logging.error(f"Failed to send email: {str(e)}")
         return {"status": "error", "message": str(e)}
 
+# ==================== NOTIFICATION SERVICE ====================
+
+def get_email_template(title: str, content: str, action_url: str = None, action_label: str = None) -> str:
+    """Generate a branded HTML email template"""
+    action_button = ""
+    if action_url and action_label:
+        action_button = f'''
+        <div style="text-align: center; margin-top: 24px;">
+            <a href="{action_url}" style="background: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">{action_label}</a>
+        </div>
+        '''
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%); padding: 24px; text-align: center;">
+                <h1 style="color: #f97316; margin: 0; font-size: 24px; font-weight: bold;">FOXITE</h1>
+            </div>
+            <div style="padding: 32px;">
+                <h2 style="color: #1f2937; margin: 0 0 16px 0; font-size: 20px;">{title}</h2>
+                <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+                    {content}
+                </div>
+                {action_button}
+            </div>
+            <div style="background: #f9fafb; padding: 16px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+                <p style="color: #9ca3af; font-size: 13px; margin: 0;">© 2026 FOXITE. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+async def create_in_app_notification(org_id: str, user_id: str, title: str, message: str):
+    """Create an in-app notification for a user"""
+    notification = Notification(
+        organization_id=org_id,
+        user_id=user_id,
+        title=title,
+        message=message
+    )
+    doc = notification.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.notifications.insert_one(doc)
+    return notification
+
+async def notify_ticket_created(ticket: dict, creator: dict):
+    """Send notifications when a ticket is created"""
+    org_id = ticket.get('organization_id')
+    ticket_number = ticket.get('ticket_number', 'N/A')
+    ticket_title = ticket.get('title', 'Untitled')
+    ticket_id = ticket.get('id')
+    
+    ticket_url = f"{FRONTEND_URL}/tickets/{ticket_id}"
+    
+    # Notify assigned technician if assigned
+    if ticket.get('assigned_staff_id'):
+        assignee = await db.staff_users.find_one({"id": ticket['assigned_staff_id']}, {"_id": 0})
+        if assignee and assignee.get('email'):
+            # Create in-app notification
+            await create_in_app_notification(
+                org_id, assignee['id'],
+                f"Ticket #{ticket_number} assigned to you",
+                f"New ticket: {ticket_title}"
+            )
+            # Send email
+            content = f"""
+            <p>A new ticket has been assigned to you:</p>
+            <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Ticket:</strong> #{ticket_number}</p>
+                <p style="margin: 0 0 8px 0;"><strong>Subject:</strong> {ticket_title}</p>
+                <p style="margin: 0 0 8px 0;"><strong>Priority:</strong> {ticket.get('priority', 'medium').upper()}</p>
+                <p style="margin: 0;"><strong>Created by:</strong> {creator.get('name', 'System')}</p>
+            </div>
+            """
+            html = get_email_template(
+                f"New Ticket Assigned: #{ticket_number}",
+                content,
+                ticket_url,
+                "View Ticket"
+            )
+            asyncio.create_task(send_email_async(assignee['email'], f"[FOXITE] Ticket #{ticket_number} assigned to you", html))
+
+async def notify_ticket_assigned(ticket: dict, assignee_id: str, assigner: dict):
+    """Send notification when a ticket is assigned to someone"""
+    org_id = ticket.get('organization_id')
+    ticket_number = ticket.get('ticket_number', 'N/A')
+    ticket_title = ticket.get('title', 'Untitled')
+    ticket_id = ticket.get('id')
+    
+    ticket_url = f"{FRONTEND_URL}/tickets/{ticket_id}"
+    
+    assignee = await db.staff_users.find_one({"id": assignee_id}, {"_id": 0})
+    if assignee and assignee.get('email'):
+        # Create in-app notification
+        await create_in_app_notification(
+            org_id, assignee['id'],
+            f"Ticket #{ticket_number} assigned to you",
+            f"{assigner.get('name', 'Someone')} assigned you to: {ticket_title}"
+        )
+        # Send email
+        content = f"""
+        <p>{assigner.get('name', 'A team member')} has assigned you to a ticket:</p>
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0 0 8px 0;"><strong>Ticket:</strong> #{ticket_number}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Subject:</strong> {ticket_title}</p>
+            <p style="margin: 0;"><strong>Priority:</strong> {ticket.get('priority', 'medium').upper()}</p>
+        </div>
+        """
+        html = get_email_template(
+            f"Ticket Assigned: #{ticket_number}",
+            content,
+            ticket_url,
+            "View Ticket"
+        )
+        asyncio.create_task(send_email_async(assignee['email'], f"[FOXITE] Ticket #{ticket_number} assigned to you", html))
+
+async def notify_ticket_status_changed(ticket: dict, old_status: str, new_status: str, changer: dict):
+    """Send notification when a ticket's status changes"""
+    org_id = ticket.get('organization_id')
+    ticket_number = ticket.get('ticket_number', 'N/A')
+    ticket_title = ticket.get('title', 'Untitled')
+    ticket_id = ticket.get('id')
+    
+    ticket_url = f"{FRONTEND_URL}/tickets/{ticket_id}"
+    
+    # Notify requester about status change
+    if ticket.get('requester_id'):
+        requester = await db.end_users.find_one({"id": ticket['requester_id']}, {"_id": 0})
+        if requester and requester.get('email'):
+            status_display = new_status.replace('_', ' ').title()
+            content = f"""
+            <p>The status of your ticket has been updated:</p>
+            <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Ticket:</strong> #{ticket_number}</p>
+                <p style="margin: 0 0 8px 0;"><strong>Subject:</strong> {ticket_title}</p>
+                <p style="margin: 0 0 8px 0;"><strong>New Status:</strong> <span style="color: #f97316; font-weight: 600;">{status_display}</span></p>
+                <p style="margin: 0;"><strong>Updated by:</strong> {changer.get('name', 'Support Team')}</p>
+            </div>
+            """
+            html = get_email_template(
+                f"Ticket Update: #{ticket_number}",
+                content,
+                ticket_url,
+                "View Ticket"
+            )
+            asyncio.create_task(send_email_async(requester['email'], f"[FOXITE] Ticket #{ticket_number} - Status: {status_display}", html))
+    
+    # Also notify assigned technician if different from changer
+    if ticket.get('assigned_staff_id') and ticket['assigned_staff_id'] != changer.get('id'):
+        assignee = await db.staff_users.find_one({"id": ticket['assigned_staff_id']}, {"_id": 0})
+        if assignee and assignee.get('email'):
+            await create_in_app_notification(
+                org_id, assignee['id'],
+                f"Ticket #{ticket_number} status changed",
+                f"Status changed from {old_status} to {new_status}"
+            )
+
+async def notify_ticket_comment_added(ticket: dict, comment: dict, commenter: dict):
+    """Send notification when a comment is added to a ticket"""
+    org_id = ticket.get('organization_id')
+    ticket_number = ticket.get('ticket_number', 'N/A')
+    ticket_title = ticket.get('title', 'Untitled')
+    ticket_id = ticket.get('id')
+    
+    ticket_url = f"{FRONTEND_URL}/tickets/{ticket_id}"
+    
+    # Only send email for public replies, not internal notes
+    if comment.get('comment_type') == 'public_reply':
+        # Notify requester
+        if ticket.get('requester_id'):
+            requester = await db.end_users.find_one({"id": ticket['requester_id']}, {"_id": 0})
+            if requester and requester.get('email'):
+                content_preview = comment.get('content', '')[:200]
+                if len(comment.get('content', '')) > 200:
+                    content_preview += '...'
+                
+                content = f"""
+                <p>A new reply has been added to your ticket:</p>
+                <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0 0 8px 0;"><strong>Ticket:</strong> #{ticket_number}</p>
+                    <p style="margin: 0 0 8px 0;"><strong>Subject:</strong> {ticket_title}</p>
+                    <p style="margin: 0 0 8px 0;"><strong>From:</strong> {commenter.get('name', 'Support Team')}</p>
+                </div>
+                <div style="background: #fff7ed; padding: 16px; border-radius: 8px; border-left: 4px solid #f97316;">
+                    <p style="margin: 0; color: #1f2937;">{content_preview}</p>
+                </div>
+                """
+                html = get_email_template(
+                    f"New Reply on Ticket #{ticket_number}",
+                    content,
+                    ticket_url,
+                    "View Full Conversation"
+                )
+                asyncio.create_task(send_email_async(requester['email'], f"[FOXITE] New reply on ticket #{ticket_number}", html))
+    
+    # Notify assigned technician about new comments (internal or public) if they didn't write it
+    if ticket.get('assigned_staff_id') and ticket['assigned_staff_id'] != commenter.get('id'):
+        assignee = await db.staff_users.find_one({"id": ticket['assigned_staff_id']}, {"_id": 0})
+        if assignee:
+            comment_type_label = "internal note" if comment.get('comment_type') == 'internal_note' else "reply"
+            await create_in_app_notification(
+                org_id, assignee['id'],
+                f"New {comment_type_label} on #{ticket_number}",
+                f"{commenter.get('name', 'Someone')} added a {comment_type_label}"
+            )
+
 # ==================== AUTH ROUTES ====================
 
 @api_router.post("/auth/register", response_model=StaffUser)
