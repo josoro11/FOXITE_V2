@@ -310,51 +310,52 @@ const FeaturesPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-950">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b z-50">
+      <nav className="fixed top-0 left-0 right-0 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
               <img src={FOXITE_LOGO} alt="FOXITE" className="h-10 w-10" />
-              <span className="text-xl font-bold text-gray-900">FOXITE</span>
+              <span className="text-xl font-bold text-white">FOXITE</span>
             </Link>
             <div className="hidden md:flex items-center gap-8">
-              <Link to="/" className="text-gray-600 hover:text-orange-500 font-medium">Home</Link>
-              <Link to="/features" className="text-orange-500 font-medium">Features</Link>
-              <Link to="/pricing" className="text-gray-600 hover:text-orange-500 font-medium">Pricing</Link>
+              <Link to="/" className="text-gray-300 hover:text-orange-400 font-medium transition-colors">Home</Link>
+              <Link to="/features" className="text-orange-400 font-medium">Features</Link>
+              <Link to="/pricing" className="text-gray-300 hover:text-orange-400 font-medium transition-colors">Pricing</Link>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>Sign In</Button>
-              <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => navigate('/login')}>Start Free Trial</Button>
+              <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={() => navigate('/login')}>Sign In</Button>
+              <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => navigate('/login')}>Start Free Trial</Button>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="pt-32 pb-16 px-4 bg-gradient-to-br from-gray-50 to-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Powerful Features for Modern MSPs</h1>
-          <p className="text-xl text-gray-600">Everything you need to deliver exceptional IT support</p>
+      <section className="pt-32 pb-16 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-gray-950" />
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <h1 className="text-4xl font-bold text-white mb-4">Powerful Features for Modern MSPs</h1>
+          <p className="text-xl text-gray-400">Everything you need to deliver exceptional IT support</p>
         </div>
       </section>
 
       {/* Feature Groups */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 bg-gray-900/50">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-2 gap-6">
             {featureGroups.map((group, i) => (
-              <Card key={i} className="border-gray-100">
+              <Card key={i} className="bg-gray-800/50 border-gray-700/50">
                 <CardHeader>
-                  <CardTitle className="text-xl">{group.title}</CardTitle>
+                  <CardTitle className="text-xl text-white">{group.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-3">
                     {group.features.map((feature, j) => (
                       <li key={j} className="flex items-start gap-3">
-                        <Check className="text-orange-500 mt-0.5 flex-shrink-0" size={18} />
-                        <span className="text-gray-700">{feature}</span>
+                        <Check className="text-orange-400 mt-0.5 flex-shrink-0" size={18} />
+                        <span className="text-gray-300">{feature}</span>
                       </li>
                     ))}
                   </ul>
@@ -366,22 +367,23 @@ const FeaturesPage = () => {
       </section>
 
       {/* CTA */}
-      <section className="py-16 px-4 bg-orange-500">
-        <div className="max-w-4xl mx-auto text-center">
+      <section className="py-16 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-t from-orange-500/10 to-transparent" />
+        <div className="max-w-4xl mx-auto text-center relative z-10">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to Get Started?</h2>
-          <p className="text-orange-100 mb-8">Start your 14-day free trial today. No credit card required.</p>
-          <Button size="lg" className="bg-white text-orange-600 hover:bg-gray-100" onClick={() => navigate('/login')}>
+          <p className="text-gray-400 mb-8">Start your 14-day free trial today. No credit card required.</p>
+          <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25" onClick={() => navigate('/login')}>
             Start Free Trial <ArrowRight size={20} className="ml-2" />
           </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 bg-gray-50 border-t">
+      <footer className="py-12 px-4 bg-gray-900 border-t border-gray-800">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img src={FOXITE_LOGO} alt="FOXITE" className="h-8 w-8" />
-            <span className="font-bold text-gray-900">FOXITE</span>
+            <span className="font-bold text-white">FOXITE</span>
           </div>
           <p className="text-sm text-gray-500">© 2026 FOXITE. All rights reserved.</p>
         </div>
