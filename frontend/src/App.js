@@ -1834,14 +1834,673 @@ const TicketDetailPage = () => {
   );
 };
 
-// Simplified placeholder pages
-const TasksPage = () => { const navigate = useNavigate(); return <div className="p-6"><h1 className="text-2xl font-bold mb-4">Tasks</h1><p className="text-gray-500">Task management page</p></div>; };
-const SessionsPage = () => <div className="p-6"><h1 className="text-2xl font-bold mb-4">Time Tracking</h1><p className="text-gray-500">Session tracking page</p></div>;
-const EndUsersPage = () => <div className="p-6"><h1 className="text-2xl font-bold mb-4">End Users</h1><p className="text-gray-500">End users management</p></div>;
-const DevicesPage = () => <div className="p-6"><h1 className="text-2xl font-bold mb-4">Devices</h1><p className="text-gray-500">Device inventory</p></div>;
-const LicensesPage = () => <div className="p-6"><h1 className="text-2xl font-bold mb-4">Licenses</h1><p className="text-gray-500">License management</p></div>;
-const CompaniesPage = () => <div className="p-6"><h1 className="text-2xl font-bold mb-4">Companies</h1><p className="text-gray-500">Client companies</p></div>;
-const SavedViewsPage = () => <div className="p-6"><h1 className="text-2xl font-bold mb-4">Saved Views</h1><p className="text-gray-500">Saved filters</p></div>;
+// ==================== TASKS PAGE (Admin/Supervisor CRUD) ====================
+
+const TasksPage = () => {
+  const { token, user } = useAuth();
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [formData, setFormData] = useState({ title: '', description: '', priority: 'medium', status: 'pending' });
+
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchTasks(); }, []);
+
+  const fetchTasks = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
+      setTasks(res.data || []);
+    } catch (e) { toast.error('Failed to load tasks'); }
+    finally { setLoading(false); }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.title.trim()) { toast.error('Title required'); return; }
+    try {
+      if (editingTask) {
+        await axios.patch(`${API_URL}/tasks/${editingTask.id}`, formData, { headers: { Authorization: `Bearer ${token}` } });
+        toast.success('Task updated');
+      } else {
+        await axios.post(`${API_URL}/tasks`, formData, { headers: { Authorization: `Bearer ${token}` } });
+        toast.success('Task created');
+      }
+      setShowCreate(false);
+      setEditingTask(null);
+      setFormData({ title: '', description: '', priority: 'medium', status: 'pending' });
+      fetchTasks();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
+  };
+
+  const deleteTask = async (id) => {
+    if (!confirm('Delete this task?')) return;
+    try {
+      await axios.delete(`${API_URL}/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Deleted');
+      fetchTasks();
+    } catch (e) { toast.error('Failed'); }
+  };
+
+  const startEdit = (task) => {
+    setEditingTask(task);
+    setFormData({ title: task.title, description: task.description || '', priority: task.priority, status: task.status });
+    setShowCreate(true);
+  };
+
+  const priorityColors = { low: 'bg-gray-100 text-gray-700', medium: 'bg-blue-100 text-blue-700', high: 'bg-orange-100 text-orange-700', urgent: 'bg-red-100 text-red-700' };
+  const statusColors = { pending: 'bg-yellow-100 text-yellow-700', in_progress: 'bg-blue-100 text-blue-700', completed: 'bg-green-100 text-green-700', cancelled: 'bg-gray-100 text-gray-700' };
+
+  return (
+    <div className="p-6" data-testid="tasks-page">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Tasks</h1>
+        {canEdit && <Button onClick={() => { setShowCreate(true); setEditingTask(null); setFormData({ title: '', description: '', priority: 'medium', status: 'pending' }); }} className="bg-orange-500 hover:bg-orange-600" data-testid="create-task-btn"><Plus size={16} className="mr-1" /> New Task</Button>}
+      </div>
+
+      {showCreate && canEdit && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>{editingTask ? 'Edit Task' : 'Create Task'}</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div><label className="text-sm font-medium">Title *</label><Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} data-testid="task-title-input" /></div>
+              <div><label className="text-sm font-medium">Description</label><textarea className="w-full border rounded-md p-2 text-sm min-h-[80px]" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Priority</label><select className="w-full border rounded-md p-2" value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+                <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
+              </div>
+              <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => { setShowCreate(false); setEditingTask(null); }}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-task-btn">{editingTask ? 'Update' : 'Create'}</Button></div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? <p>Loading...</p> : tasks.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><CheckSquare size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-gray-500">No tasks yet</p></CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {tasks.map((task) => (
+            <Card key={task.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-medium">{task.title}</h3>
+                    {task.description && <p className="text-sm text-gray-500 mt-1">{task.description}</p>}
+                    <div className="flex gap-2 mt-2">
+                      <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
+                      <Badge className={statusColors[task.status]}>{task.status?.replace('_', ' ')}</Badge>
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => startEdit(task)}><Edit size={16} /></Button>
+                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => deleteTask(task.id)}><Trash2 size={16} /></Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== SESSIONS/TIME TRACKING PAGE ====================
+
+const SessionsPage = () => {
+  const { token } = useAuth();
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { fetchSessions(); }, []);
+
+  const fetchSessions = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/sessions`, { headers: { Authorization: `Bearer ${token}` } });
+      setSessions(res.data || []);
+    } catch (e) { toast.error('Failed to load sessions'); }
+    finally { setLoading(false); }
+  };
+
+  const totalTime = sessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
+
+  return (
+    <div className="p-6" data-testid="sessions-page">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Time Tracking</h1>
+        <Badge variant="outline" className="text-lg px-4 py-2"><Clock size={18} className="mr-2" />{Math.floor(totalTime / 60)}h {totalTime % 60}m total</Badge>
+      </div>
+      <p className="text-gray-500 mb-4">Time entries are managed per ticket. Open a ticket to start/stop timer or add manual entries.</p>
+
+      {loading ? <p>Loading...</p> : sessions.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Clock size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-gray-500">No time entries yet</p></CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {sessions.map((s) => (
+            <Card key={s.id}>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Ticket #{s.ticket_id?.slice(-6) || 'Unknown'}</p>
+                    <p className="text-sm text-gray-500">{formatDateTime(s.start_time)}{s.notes && ` - ${s.notes}`}</p>
+                  </div>
+                  <Badge variant={!s.end_time ? 'default' : 'secondary'} className={!s.end_time ? 'bg-green-600' : ''}>
+                    {!s.end_time ? 'Running...' : `${s.duration_minutes} min`}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== END USERS PAGE (Admin/Supervisor CRUD) ====================
+
+const EndUsersPage = () => {
+  const { token, user } = useAuth();
+  const [endUsers, setEndUsers] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', client_company_id: '' });
+
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchEndUsers(); fetchCompanies(); }, []);
+
+  const fetchEndUsers = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/end-users`, { headers: { Authorization: `Bearer ${token}` } });
+      setEndUsers(res.data || []);
+    } catch (e) { toast.error('Failed to load end users'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/client-companies`, { headers: { Authorization: `Bearer ${token}` } });
+      setCompanies(res.data || []);
+    } catch (e) {}
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim() || !formData.email.trim()) { toast.error('Name and email required'); return; }
+    try {
+      await axios.post(`${API_URL}/end-users`, formData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('End user created');
+      setShowCreate(false);
+      setFormData({ name: '', email: '', phone: '', client_company_id: '' });
+      fetchEndUsers();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
+  };
+
+  return (
+    <div className="p-6" data-testid="end-users-page">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">End Users</h1>
+        {canEdit && <Button onClick={() => setShowCreate(true)} className="bg-orange-500 hover:bg-orange-600" data-testid="create-enduser-btn"><UserPlus size={16} className="mr-1" /> New End User</Button>}
+      </div>
+
+      {showCreate && canEdit && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Create End User</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} data-testid="enduser-name-input" /></div>
+                <div><label className="text-sm font-medium">Email *</label><Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} data-testid="enduser-email-input" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Phone</label><Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={(e) => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- Select --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              </div>
+              <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-enduser-btn">Create</Button></div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? <p>Loading...</p> : endUsers.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Users size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-gray-500">No end users yet</p></CardContent></Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {endUsers.map((eu) => (
+            <Card key={eu.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-orange-600 font-semibold">{eu.name?.charAt(0)?.toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium truncate">{eu.name}</h3>
+                    <p className="text-sm text-gray-500 truncate">{eu.email}</p>
+                    {eu.phone && <p className="text-sm text-gray-400">{eu.phone}</p>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== DEVICES PAGE ====================
+
+const DevicesPage = () => {
+  const { token, user } = useAuth();
+  const [devices, setDevices] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [formData, setFormData] = useState({ name: '', device_type: 'desktop', status: 'active', serial_number: '', client_company_id: '' });
+
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchDevices(); fetchCompanies(); }, []);
+
+  const fetchDevices = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/devices`, { headers: { Authorization: `Bearer ${token}` } });
+      setDevices(res.data || []);
+    } catch (e) { toast.error('Failed to load devices'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/client-companies`, { headers: { Authorization: `Bearer ${token}` } });
+      setCompanies(res.data || []);
+    } catch (e) {}
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) { toast.error('Name required'); return; }
+    try {
+      await axios.post(`${API_URL}/devices`, formData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Device created');
+      setShowCreate(false);
+      setFormData({ name: '', device_type: 'desktop', status: 'active', serial_number: '', client_company_id: '' });
+      fetchDevices();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
+  };
+
+  const deleteDevice = async (id) => {
+    if (!confirm('Delete this device?')) return;
+    try {
+      await axios.delete(`${API_URL}/devices/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Deleted');
+      fetchDevices();
+    } catch (e) { toast.error('Failed'); }
+  };
+
+  const statusColors = { active: 'bg-green-100 text-green-700', inactive: 'bg-gray-100 text-gray-700', maintenance: 'bg-yellow-100 text-yellow-700', retired: 'bg-red-100 text-red-700' };
+
+  return (
+    <div className="p-6" data-testid="devices-page">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Devices</h1>
+        {canEdit && <Button onClick={() => setShowCreate(true)} className="bg-orange-500 hover:bg-orange-600" data-testid="create-device-btn"><Plus size={16} className="mr-1" /> New Device</Button>}
+      </div>
+
+      {showCreate && canEdit && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Create Device</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} data-testid="device-name-input" /></div>
+                <div><label className="text-sm font-medium">Serial Number</label><Input value={formData.serial_number} onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className="text-sm font-medium">Type</label><select className="w-full border rounded-md p-2" value={formData.device_type} onChange={(e) => setFormData({ ...formData, device_type: e.target.value })}><option value="desktop">Desktop</option><option value="laptop">Laptop</option><option value="server">Server</option><option value="printer">Printer</option><option value="network">Network</option><option value="mobile">Mobile</option><option value="other">Other</option></select></div>
+                <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="active">Active</option><option value="inactive">Inactive</option><option value="maintenance">Maintenance</option><option value="retired">Retired</option></select></div>
+                <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={(e) => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- Select --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              </div>
+              <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-device-btn">Create</Button></div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? <p>Loading...</p> : devices.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Monitor size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-gray-500">No devices yet</p></CardContent></Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {devices.map((d) => (
+            <Card key={d.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="py-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0"><Monitor size={20} className="text-blue-600" /></div>
+                    <div>
+                      <h3 className="font-medium">{d.name}</h3>
+                      <p className="text-sm text-gray-500">{d.device_type}</p>
+                      {d.serial_number && <p className="text-xs text-gray-400">{d.serial_number}</p>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge className={statusColors[d.status]}>{d.status}</Badge>
+                    {canEdit && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteDevice(d.id)}><Trash2 size={14} /></Button>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== LICENSES PAGE (Admin/Supervisor CRUD) ====================
+
+const LicensesPage = () => {
+  const { token, user } = useAuth();
+  const [licenses, setLicenses] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [formData, setFormData] = useState({ name: '', license_type: 'perpetual', status: 'active', seats_total: 1, expiration_date: '', client_company_id: '' });
+
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchLicenses(); fetchCompanies(); }, []);
+
+  const fetchLicenses = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/licenses`, { headers: { Authorization: `Bearer ${token}` } });
+      setLicenses(res.data || []);
+    } catch (e) { toast.error('Failed to load licenses'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/client-companies`, { headers: { Authorization: `Bearer ${token}` } });
+      setCompanies(res.data || []);
+    } catch (e) {}
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) { toast.error('Name required'); return; }
+    try {
+      const submitData = { ...formData };
+      if (!submitData.expiration_date) delete submitData.expiration_date;
+      await axios.post(`${API_URL}/licenses`, submitData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('License created');
+      setShowCreate(false);
+      setFormData({ name: '', license_type: 'perpetual', status: 'active', seats_total: 1, expiration_date: '', client_company_id: '' });
+      fetchLicenses();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
+  };
+
+  const deleteLicense = async (id) => {
+    if (!confirm('Delete this license?')) return;
+    try {
+      await axios.delete(`${API_URL}/licenses/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Deleted');
+      fetchLicenses();
+    } catch (e) { toast.error('Failed'); }
+  };
+
+  const statusColors = { active: 'bg-green-100 text-green-700', inactive: 'bg-gray-100 text-gray-700', expired: 'bg-red-100 text-red-700' };
+
+  return (
+    <div className="p-6" data-testid="licenses-page">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Licenses</h1>
+        {canEdit && <Button onClick={() => setShowCreate(true)} className="bg-orange-500 hover:bg-orange-600" data-testid="create-license-btn"><Plus size={16} className="mr-1" /> New License</Button>}
+      </div>
+
+      {showCreate && canEdit && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Create License</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} data-testid="license-name-input" /></div>
+                <div><label className="text-sm font-medium">Type</label><select className="w-full border rounded-md p-2" value={formData.license_type} onChange={(e) => setFormData({ ...formData, license_type: e.target.value })}><option value="perpetual">Perpetual</option><option value="subscription">Subscription</option><option value="trial">Trial</option></select></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className="text-sm font-medium">Seats</label><Input type="number" min="1" value={formData.seats_total} onChange={(e) => setFormData({ ...formData, seats_total: parseInt(e.target.value) || 1 })} /></div>
+                <div><label className="text-sm font-medium">Expiration</label><Input type="date" value={formData.expiration_date} onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={(e) => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- Select --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              </div>
+              <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-license-btn">Create</Button></div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? <p>Loading...</p> : licenses.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Key size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-gray-500">No licenses yet</p></CardContent></Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {licenses.map((l) => (
+            <Card key={l.id} className={`hover:shadow-md transition-shadow ${l.expired ? 'border-red-200' : l.expiring_soon ? 'border-yellow-200' : ''}`}>
+              <CardContent className="py-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${l.expired ? 'bg-red-100' : 'bg-purple-100'}`}><Key size={20} className={l.expired ? 'text-red-600' : 'text-purple-600'} /></div>
+                    <div>
+                      <h3 className="font-medium">{l.name}</h3>
+                      <p className="text-sm text-gray-500">{l.license_type} • {l.seats_total} seats</p>
+                      {l.expiration_date && <p className="text-xs text-gray-400">Expires: {l.expiration_date.slice(0, 10)}</p>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge className={l.expired ? 'bg-red-100 text-red-700' : l.expiring_soon ? 'bg-yellow-100 text-yellow-700' : statusColors[l.status]}>{l.expired ? 'Expired' : l.expiring_soon ? 'Expiring Soon' : l.status}</Badge>
+                    {canEdit && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteLicense(l.id)}><Trash2 size={14} /></Button>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== COMPANIES PAGE (Admin/Supervisor CRUD) ====================
+
+const CompaniesPage = () => {
+  const { token, user } = useAuth();
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [formData, setFormData] = useState({ name: '', domain: '', industry: '', phone: '', address: '' });
+
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchCompanies(); }, []);
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/client-companies`, { headers: { Authorization: `Bearer ${token}` } });
+      setCompanies(res.data || []);
+    } catch (e) { toast.error('Failed to load companies'); }
+    finally { setLoading(false); }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) { toast.error('Name required'); return; }
+    try {
+      await axios.post(`${API_URL}/client-companies`, formData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Company created');
+      setShowCreate(false);
+      setFormData({ name: '', domain: '', industry: '', phone: '', address: '' });
+      fetchCompanies();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
+  };
+
+  return (
+    <div className="p-6" data-testid="companies-page">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Client Companies</h1>
+        {canEdit && <Button onClick={() => setShowCreate(true)} className="bg-orange-500 hover:bg-orange-600" data-testid="create-company-btn"><Building size={16} className="mr-1" /> New Company</Button>}
+      </div>
+
+      {showCreate && canEdit && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Create Company</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} data-testid="company-name-input" /></div>
+                <div><label className="text-sm font-medium">Domain</label><Input value={formData.domain} onChange={(e) => setFormData({ ...formData, domain: e.target.value })} placeholder="company.com" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Industry</label><Input value={formData.industry} onChange={(e) => setFormData({ ...formData, industry: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Phone</label><Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+              </div>
+              <div><label className="text-sm font-medium">Address</label><Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+              <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-company-btn">Create</Button></div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? <p>Loading...</p> : companies.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Building2 size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-gray-500">No companies yet</p></CardContent></Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {companies.map((c) => (
+            <Card key={c.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0"><Building2 size={20} className="text-indigo-600" /></div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium truncate">{c.name}</h3>
+                    {c.domain && <p className="text-sm text-blue-500">{c.domain}</p>}
+                    {c.industry && <p className="text-sm text-gray-500">{c.industry}</p>}
+                    {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== SAVED VIEWS PAGE (Admin/Supervisor CRUD) ====================
+
+const SavedViewsPage = () => {
+  const { token, user } = useAuth();
+  const [views, setViews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [formData, setFormData] = useState({ name: '', entity_type: 'ticket', filters: {} });
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
+
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchViews(); }, []);
+
+  const fetchViews = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/saved-views`, { headers: { Authorization: `Bearer ${token}` } });
+      setViews(res.data || []);
+    } catch (e) { toast.error('Failed to load saved views'); }
+    finally { setLoading(false); }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) { toast.error('Name required'); return; }
+    const filters = {};
+    if (filterStatus) filters.status = filterStatus;
+    if (filterPriority) filters.priority = filterPriority;
+    try {
+      await axios.post(`${API_URL}/saved-views`, { ...formData, filters }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('View saved');
+      setShowCreate(false);
+      setFormData({ name: '', entity_type: 'ticket', filters: {} });
+      setFilterStatus('');
+      setFilterPriority('');
+      fetchViews();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
+  };
+
+  const deleteView = async (id) => {
+    if (!confirm('Delete this view?')) return;
+    try {
+      await axios.delete(`${API_URL}/saved-views/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Deleted');
+      fetchViews();
+    } catch (e) { toast.error('Failed'); }
+  };
+
+  return (
+    <div className="p-6" data-testid="saved-views-page">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Saved Views</h1>
+        {canEdit && <Button onClick={() => setShowCreate(true)} className="bg-orange-500 hover:bg-orange-600" data-testid="create-view-btn"><Save size={16} className="mr-1" /> New View</Button>}
+      </div>
+
+      {showCreate && canEdit && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Create Saved View</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} data-testid="view-name-input" placeholder="My Open Tickets" /></div>
+                <div><label className="text-sm font-medium">Entity Type</label><select className="w-full border rounded-md p-2" value={formData.entity_type} onChange={(e) => setFormData({ ...formData, entity_type: e.target.value })}><option value="ticket">Tickets</option><option value="device">Devices</option><option value="license">Licenses</option><option value="task">Tasks</option></select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Filter: Status</label><select className="w-full border rounded-md p-2" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}><option value="">Any</option><option value="new">New</option><option value="open">Open</option><option value="in_progress">In Progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></div>
+                <div><label className="text-sm font-medium">Filter: Priority</label><select className="w-full border rounded-md p-2" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}><option value="">Any</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+              </div>
+              <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-view-btn">Save View</Button></div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? <p>Loading...</p> : views.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Filter size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-gray-500">No saved views yet</p></CardContent></Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {views.map((v) => (
+            <Card key={v.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="py-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0"><Filter size={20} className="text-teal-600" /></div>
+                    <div>
+                      <h3 className="font-medium">{v.name}</h3>
+                      <p className="text-sm text-gray-500">{v.entity_type}</p>
+                      {v.filters && Object.keys(v.filters).length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">{Object.entries(v.filters).map(([k, val]) => <Badge key={k} variant="outline" className="text-xs">{k}: {val}</Badge>)}</div>
+                      )}
+                    </div>
+                  </div>
+                  {canEdit && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteView(v.id)}><Trash2 size={14} /></Button>}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ==================== PROTECTED ROUTE ====================
 
