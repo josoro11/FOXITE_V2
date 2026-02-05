@@ -2162,6 +2162,9 @@ async def create_ticket_comment(
         {"$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
+    # Send notifications for new comment
+    asyncio.create_task(notify_ticket_comment_added(ticket, doc, current_user))
+    
     return comment
 
 @api_router.get("/tickets/{ticket_id}/comments", response_model=List[TicketComment])
