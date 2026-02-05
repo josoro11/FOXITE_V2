@@ -146,60 +146,62 @@ const LandingPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-950">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b z-50">
+      <nav className="fixed top-0 left-0 right-0 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
               <img src={FOXITE_LOGO} alt="FOXITE" className="h-10 w-10" />
-              <span className="text-xl font-bold text-gray-900">FOXITE</span>
+              <span className="text-xl font-bold text-white">FOXITE</span>
             </Link>
             <div className="hidden md:flex items-center gap-8">
-              <Link to="/" className="text-gray-600 hover:text-orange-500 font-medium">Home</Link>
-              <Link to="/features" className="text-gray-600 hover:text-orange-500 font-medium">Features</Link>
-              <Link to="/pricing" className="text-gray-600 hover:text-orange-500 font-medium">Pricing</Link>
+              <Link to="/" className="text-gray-300 hover:text-orange-400 font-medium transition-colors">Home</Link>
+              <Link to="/features" className="text-gray-300 hover:text-orange-400 font-medium transition-colors">Features</Link>
+              <Link to="/pricing" className="text-gray-300 hover:text-orange-400 font-medium transition-colors">Pricing</Link>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>Sign In</Button>
-              <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => navigate('/login')}>Start Free Trial</Button>
+              <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={() => navigate('/login')}>Sign In</Button>
+              <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => navigate('/login')}>Start Free Trial</Button>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 bg-gradient-to-br from-gray-50 via-white to-orange-50">
-        <div className="max-w-7xl mx-auto text-center">
-          <Badge className="mb-4 bg-orange-100 text-orange-700 border-orange-200">Built for MSPs & IT Teams</Badge>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+      <section className="pt-32 pb-24 px-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-500/10 via-transparent to-transparent" />
+        <div className="max-w-7xl mx-auto text-center relative z-10">
+          <Badge className="mb-6 bg-orange-500/20 text-orange-400 border-orange-500/30 backdrop-blur-sm">Built for MSPs & IT Teams</Badge>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
             IT Service Management<br />
-            <span className="text-orange-500">Made Simple</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">Made Simple</span>
           </h1>
-          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
+          <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10">
             Streamline your IT operations with FOXITE. Manage tickets, track assets, 
             monitor SLAs, and deliver exceptional support to your clients.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-lg px-8" onClick={() => navigate('/login')}>
+            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white text-lg px-8 shadow-lg shadow-orange-500/25" onClick={() => navigate('/login')}>
               Start Free Trial <ArrowRight size={20} className="ml-2" />
             </Button>
-            <Button size="lg" variant="outline" className="text-lg px-8" onClick={() => navigate('/features')}>
+            <Button size="lg" variant="outline" className="text-white border-gray-600 hover:bg-gray-800 hover:border-gray-500 text-lg px-8" onClick={() => navigate('/features')}>
               See Features
             </Button>
           </div>
-          <p className="text-sm text-gray-500 mt-4">No credit card required • 14-day free trial</p>
+          <p className="text-sm text-gray-500 mt-6">No credit card required • 14-day free trial</p>
         </div>
       </section>
 
       {/* Features Overview */}
-      <section className="py-20 px-4 bg-white">
+      <section className="py-24 px-4 bg-gray-900/50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Everything You Need to Manage IT Services</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">From ticket management to asset tracking, FOXITE provides all the tools your MSP needs.</p>
+            <h2 className="text-3xl font-bold text-white mb-4">Everything You Need to Manage IT Services</h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">From ticket management to asset tracking, FOXITE provides all the tools your MSP needs.</p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { icon: Ticket, title: 'Ticket Management', desc: 'Efficient ticketing with priorities, SLAs, and automated workflows' },
               { icon: Monitor, title: 'Asset Tracking', desc: 'Track devices, licenses, and manage your clients\' inventory' },
@@ -208,13 +210,13 @@ const LandingPage = () => {
               { icon: Users2, title: 'Multi-Tenant', desc: 'Manage multiple client companies from one dashboard' },
               { icon: Bell, title: 'Notifications', desc: 'Stay informed with email alerts for ticket updates' },
             ].map((feature, i) => (
-              <Card key={i} className="border-gray-100 hover:shadow-lg transition-shadow">
+              <Card key={i} className="bg-gray-800/50 border-gray-700/50 hover:border-orange-500/30 transition-all hover:shadow-lg hover:shadow-orange-500/5">
                 <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
-                    <feature.icon className="text-orange-600" size={24} />
+                  <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center mb-4">
+                    <feature.icon className="text-orange-400" size={24} />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.desc}</p>
+                  <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
+                  <p className="text-gray-400">{feature.desc}</p>
                 </CardContent>
               </Card>
             ))}
@@ -223,28 +225,29 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 bg-gray-900">
-        <div className="max-w-4xl mx-auto text-center">
+      <section className="py-24 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-t from-orange-500/5 to-transparent" />
+        <div className="max-w-4xl mx-auto text-center relative z-10">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to Transform Your IT Operations?</h2>
           <p className="text-gray-400 mb-8">Join MSPs and IT teams who trust FOXITE to deliver exceptional service.</p>
-          <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-lg px-8" onClick={() => navigate('/login')}>
+          <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white text-lg px-8 shadow-lg shadow-orange-500/25" onClick={() => navigate('/login')}>
             Get Started Free <ArrowRight size={20} className="ml-2" />
           </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 bg-gray-50 border-t">
+      <footer className="py-12 px-4 bg-gray-900 border-t border-gray-800">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <img src={FOXITE_LOGO} alt="FOXITE" className="h-8 w-8" />
-              <span className="font-bold text-gray-900">FOXITE</span>
+              <span className="font-bold text-white">FOXITE</span>
             </div>
-            <div className="flex gap-6 text-sm text-gray-600">
-              <Link to="/features" className="hover:text-orange-500">Features</Link>
-              <Link to="/pricing" className="hover:text-orange-500">Pricing</Link>
-              <Link to="/login" className="hover:text-orange-500">Login</Link>
+            <div className="flex gap-6 text-sm text-gray-400">
+              <Link to="/features" className="hover:text-orange-400 transition-colors">Features</Link>
+              <Link to="/pricing" className="hover:text-orange-400 transition-colors">Pricing</Link>
+              <Link to="/login" className="hover:text-orange-400 transition-colors">Login</Link>
             </div>
             <p className="text-sm text-gray-500">© 2026 FOXITE. All rights reserved.</p>
           </div>
