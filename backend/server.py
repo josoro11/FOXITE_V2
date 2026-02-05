@@ -2090,6 +2090,10 @@ async def update_ticket(ticket_id: str, update_data: TicketUpdate, current_user:
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     
+    # Store old values for notification comparison
+    old_status = ticket.get('status')
+    old_assigned_staff_id = ticket.get('assigned_staff_id')
+    
     update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
     update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
     
@@ -2098,6 +2102,16 @@ async def update_ticket(ticket_id: str, update_data: TicketUpdate, current_user:
         await log_audit(org_id, current_user['id'], "UPDATE", "ticket", ticket_id)
     
     updated_ticket = await db.tickets.find_one({"id": ticket_id}, {"_id": 0})
+    
+    # Send notifications for status change
+    new_status = update_data.status
+    if new_status and new_status != old_status:
+        asyncio.create_task(notify_ticket_status_changed(updated_ticket, old_status, new_status, current_user))
+    
+    # Send notifications for assignment change
+    new_assigned_staff_id = update_data.assigned_staff_id
+    if new_assigned_staff_id and new_assigned_staff_id != old_assigned_staff_id:
+        asyncio.create_task(notify_ticket_assigned(updated_ticket, new_assigned_staff_id, current_user))
     
     if isinstance(updated_ticket.get('created_at'), str):
         updated_ticket['created_at'] = datetime.fromisoformat(updated_ticket['created_at'])
