@@ -1600,6 +1600,18 @@ const ProtectedRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
+// ==================== PUBLIC ROUTE (redirects authenticated users to dashboard) ====================
+
+const PublicRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>;
+  // Redirect authenticated users (except owner) to dashboard
+  if (user && user.role !== 'owner') {
+    return <Navigate to="/dashboard" />;
+  }
+  return children;
+};
+
 // ==================== MAIN APP ====================
 
 function App() {
@@ -1607,11 +1619,11 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Website */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/features" element={<FeaturesPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/login" element={<LoginPage />} />
+          {/* Public Website - redirects authenticated users to dashboard */}
+          <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+          <Route path="/features" element={<PublicRoute><FeaturesPage /></PublicRoute>} />
+          <Route path="/pricing" element={<PublicRoute><PricingPage /></PublicRoute>} />
+          <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           
           {/* Protected App */}
           <Route path="/*" element={
