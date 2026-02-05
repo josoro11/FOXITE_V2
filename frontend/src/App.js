@@ -433,73 +433,73 @@ const PricingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-950">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b z-50">
+      <nav className="fixed top-0 left-0 right-0 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
               <img src={FOXITE_LOGO} alt="FOXITE" className="h-10 w-10" />
-              <span className="text-xl font-bold text-gray-900">FOXITE</span>
+              <span className="text-xl font-bold text-white">FOXITE</span>
             </Link>
             <div className="hidden md:flex items-center gap-8">
-              <Link to="/" className="text-gray-600 hover:text-orange-500 font-medium">Home</Link>
-              <Link to="/features" className="text-gray-600 hover:text-orange-500 font-medium">Features</Link>
-              <Link to="/pricing" className="text-orange-500 font-medium">Pricing</Link>
+              <Link to="/" className="text-gray-300 hover:text-orange-400 font-medium transition-colors">Home</Link>
+              <Link to="/features" className="text-gray-300 hover:text-orange-400 font-medium transition-colors">Features</Link>
+              <Link to="/pricing" className="text-orange-400 font-medium">Pricing</Link>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>Sign In</Button>
-              <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => navigate('/login')}>Start Free Trial</Button>
+              <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={() => navigate('/login')}>Sign In</Button>
+              <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => navigate('/login')}>Start Free Trial</Button>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="pt-32 pb-16 px-4 bg-gradient-to-br from-gray-50 to-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h1>
-          <p className="text-xl text-gray-600">Choose the plan that fits your needs. All plans include a 14-day free trial.</p>
+      <section className="pt-32 pb-16 px-4 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-gray-950" />
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <h1 className="text-4xl font-bold text-white mb-4">Simple, Transparent Pricing</h1>
+          <p className="text-xl text-gray-400">Choose the plan that fits your needs. All plans include a 14-day free trial.</p>
         </div>
       </section>
 
       {/* Pricing Cards */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 bg-gray-900/50">
         <div className="max-w-6xl mx-auto">
           {loading ? (
-            <div className="text-center py-12">Loading plans...</div>
+            <div className="text-center py-12 text-gray-400">Loading plans...</div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-3 gap-6">
               {plans.map((plan, i) => (
-                <Card key={plan.id} className={`relative ${i === 1 ? 'border-orange-500 border-2 shadow-lg' : 'border-gray-200'}`}>
+                <Card key={plan.id} className={`relative bg-gray-800/50 ${i === 1 ? 'border-orange-500 border-2 shadow-lg shadow-orange-500/10' : 'border-gray-700/50'}`}>
                   {i === 1 && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <Badge className="bg-orange-500 text-white">Most Popular</Badge>
+                      <Badge className="bg-orange-500 text-white shadow-lg shadow-orange-500/25">Most Popular</Badge>
                     </div>
                   )}
                   <CardHeader className="text-center pb-2">
-                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                    <CardTitle className="text-2xl text-white">{plan.name}</CardTitle>
                     <div className="mt-4">
-                      <span className="text-4xl font-bold">${plan.price}</span>
-                      <span className="text-gray-500">/month</span>
+                      <span className="text-4xl font-bold text-white">${plan.price}</span>
+                      <span className="text-gray-400">/month</span>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-3 mb-6">
                       {getPlanFeatures(plan).map((feature, j) => (
-                        <li key={j} className={`flex items-center gap-2 ${feature.included ? 'text-gray-700' : 'text-gray-400'}`}>
+                        <li key={j} className={`flex items-center gap-2 ${feature.included ? 'text-gray-300' : 'text-gray-600'}`}>
                           {feature.included ? (
-                            <Check className="text-green-500 flex-shrink-0" size={16} />
+                            <Check className="text-green-400 flex-shrink-0" size={16} />
                           ) : (
-                            <X className="text-gray-300 flex-shrink-0" size={16} />
+                            <X className="text-gray-600 flex-shrink-0" size={16} />
                           )}
                           <span className="text-sm">{feature.text}</span>
                         </li>
                       ))}
                     </ul>
                     <Button 
-                      className={`w-full ${i === 1 ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-                      variant={i === 1 ? 'default' : 'outline'}
+                      className={`w-full ${i === 1 ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25' : 'bg-gray-700 hover:bg-gray-600 text-white border-0'}`}
                       onClick={() => navigate('/login')}
                     >
                       Start Free Trial
@@ -513,9 +513,9 @@ const PricingPage = () => {
       </section>
 
       {/* FAQ */}
-      <section className="py-16 px-4 bg-gray-50">
+      <section className="py-16 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h2>
+          <h2 className="text-2xl font-bold text-center text-white mb-8">Frequently Asked Questions</h2>
           <div className="space-y-4">
             {[
               { q: 'Can I change plans later?', a: 'Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.' },
@@ -523,10 +523,10 @@ const PricingPage = () => {
               { q: 'What happens when I hit my limits?', a: 'You\'ll receive a notification and can upgrade your plan to increase limits.' },
               { q: 'Do you offer discounts for annual billing?', a: 'Yes, annual plans receive a 20% discount. Contact us for details.' },
             ].map((faq, i) => (
-              <Card key={i}>
+              <Card key={i} className="bg-gray-800/50 border-gray-700/50">
                 <CardContent className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-2">{faq.q}</h3>
-                  <p className="text-gray-600 text-sm">{faq.a}</p>
+                  <h3 className="font-semibold text-white mb-2">{faq.q}</h3>
+                  <p className="text-gray-400 text-sm">{faq.a}</p>
                 </CardContent>
               </Card>
             ))}
@@ -535,11 +535,11 @@ const PricingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 bg-white border-t">
+      <footer className="py-12 px-4 bg-gray-900 border-t border-gray-800">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img src={FOXITE_LOGO} alt="FOXITE" className="h-8 w-8" />
-            <span className="font-bold text-gray-900">FOXITE</span>
+            <span className="font-bold text-white">FOXITE</span>
           </div>
           <p className="text-sm text-gray-500">© 2026 FOXITE. All rights reserved.</p>
         </div>
