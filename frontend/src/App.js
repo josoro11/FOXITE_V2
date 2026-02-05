@@ -668,6 +668,130 @@ const LoginPage = () => {
   );
 };
 
+// ==================== NOTIFICATION BELL COMPONENT ====================
+
+const NotificationBell = () => {
+  const { token } = useAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const fetchNotifications = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(res.data || []);
+      setUnreadCount((res.data || []).filter(n => !n.read).length);
+    } catch (error) {
+      console.error('Failed to fetch notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  const markAsRead = async (notifId) => {
+    try {
+      await axios.patch(`${API_URL}/notifications/${notifId}/read`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Failed to mark notification as read');
+    }
+  };
+
+  const handleOpen = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      fetchNotifications();
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={handleOpen}
+        className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        data-testid="notification-bell"
+      >
+        <Bell size={20} className="text-gray-600" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center" data-testid="notification-badge">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border z-50 overflow-hidden" data-testid="notification-dropdown">
+            <div className="p-3 border-b bg-gray-50">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Notifications</h3>
+                {unreadCount > 0 && (
+                  <Badge className="bg-orange-100 text-orange-700 text-xs">{unreadCount} new</Badge>
+                )}
+              </div>
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {loading ? (
+                <div className="p-4 text-center text-gray-500">Loading...</div>
+              ) : notifications.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Bell size={32} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500 text-sm">No notifications yet</p>
+                </div>
+              ) : (
+                notifications.slice(0, 10).map((notif) => (
+                  <div
+                    key={notif.id}
+                    onClick={() => !notif.read && markAsRead(notif.id)}
+                    className={`p-3 border-b last:border-b-0 cursor-pointer transition-colors ${
+                      notif.read ? 'bg-white' : 'bg-orange-50 hover:bg-orange-100'
+                    }`}
+                    data-testid={`notification-item-${notif.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notif.read ? 'bg-gray-300' : 'bg-orange-500'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${notif.read ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
+                          {notif.title}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{notif.message}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {formatDateTime(notif.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            {notifications.length > 0 && (
+              <div className="p-2 border-t bg-gray-50">
+                <p className="text-xs text-center text-gray-500">Showing latest {Math.min(10, notifications.length)} notifications</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ==================== DASHBOARD LAYOUT ====================
 
 const DashboardLayout = ({ children }) => {
