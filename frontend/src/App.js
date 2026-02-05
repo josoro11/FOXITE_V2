@@ -930,7 +930,20 @@ const DashboardLayout = ({ children }) => {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">{children}</main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Header with Notification Bell */}
+        <header className="h-14 bg-white border-b flex items-center justify-end px-4 gap-3 flex-shrink-0">
+          <NotificationBell />
+          <div className="w-px h-6 bg-gray-200" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+              <span className="text-orange-600 font-semibold text-sm">{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
+            </div>
+            <span className="text-sm font-medium text-gray-700 hidden sm:block">{user?.name}</span>
+          </div>
+        </header>
+        <main className="flex-1 overflow-auto">{children}</main>
+      </div>
     </div>
   );
 };
