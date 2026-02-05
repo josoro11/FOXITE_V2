@@ -250,6 +250,44 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - 404 handling redirects to dashboard
 - Loading states for all data fetches
 
+### Phase 4A: SaaS Readiness & Communications (✅ Complete - Feb 5, 2026)
+**Public Website:**
+- Landing page with hero section, feature overview, CTA sections
+- Features page with detailed feature groupings
+- Pricing page showing CORE ($25), PLUS ($55), PRIME ($90) plans only (SCALE hidden for future)
+- Professional navigation with FOXITE branding
+- Footer with links
+
+**Authenticated User Redirect:**
+- PublicRoute component redirects logged-in users to dashboard
+- Owner role is exempt from redirect (dev-only access to public pages)
+
+**Settings UI (Admin/Supervisor only):**
+- Organization settings (name, plan info, branding options)
+- Business Hours configuration
+- SLA Policies management
+- Notifications section (Coming Soon placeholder)
+- Workflows section (Coming Soon placeholder)
+- Automations section (Coming Soon placeholder)
+
+**Role Protection:**
+- Settings page only accessible by Admin and Supervisor roles
+- Technicians redirected to dashboard when trying to access settings
+- Settings link hidden from sidebar for Technician role
+- Owner role completely hidden from production UI
+
+**Email Notification Service:**
+- Centralized notification service using Resend
+- Branded email templates with FOXITE styling
+- Notification triggers for ticket events:
+  - Ticket created (notify assigned technician)
+  - Ticket assigned (notify new assignee)
+  - Ticket status changed (notify requester and assigned technician)
+  - Ticket comment added (notify requester for public replies, notify assignee for all comments)
+- In-app notifications stored in database
+- API endpoints: GET /api/notifications, PATCH /api/notifications/{id}/read
+- **Note:** Email sending requires valid Resend API key (currently using placeholder)
+
 ## Upcoming Tasks (Backlog)
 - Public website (Home, Features, Pricing)
 - UI polish and enhanced frontend
