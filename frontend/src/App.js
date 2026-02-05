@@ -6,7 +6,8 @@ import {
   ArrowLeft, Send, MessageSquare, Lock, ChevronDown, Clock, CheckSquare, FileText,
   Filter, Play, Square, AlertTriangle, Calendar, RefreshCw, Trash2, Edit, Eye,
   Shield, TrendingUp, AlertCircle, Package, Settings, Bell, ChevronRight, Zap,
-  Globe, Mail, Check, Star, ArrowRight, Headphones, BarChart3, Users2, Layers
+  Globe, Mail, Check, Star, ArrowRight, Headphones, BarChart3, Users2, Layers,
+  PlayCircle, StopCircle, Save, UserPlus, Building, Key
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
