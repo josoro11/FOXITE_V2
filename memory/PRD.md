@@ -288,6 +288,26 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - API endpoints: GET /api/notifications, PATCH /api/notifications/{id}/read
 - **Note:** Email sending requires valid Resend API key (currently using placeholder)
 
+### Phase 4B: In-App Notifications & Dark Theme (✅ Complete - Feb 5, 2026)
+**In-App Notifications UI:**
+- Notification bell icon added to dashboard header
+- Unread count badge (orange, shows 9+ for counts >9)
+- Dropdown with list of latest 10 notifications
+- Each notification shows: title, message preview, timestamp
+- Unread notifications highlighted with orange background
+- Click to mark as read (badge count decreases)
+- Auto-refresh every 30 seconds
+- Read-only (no delete, no preferences yet)
+
+**Public Website Dark Theme:**
+- Landing page: bg-gray-950 background, white/gray text, orange accents
+- Features page: Dark feature cards with bg-gray-800/50
+- Pricing page: Dark pricing cards with glowing orange borders for popular plan
+- Consistent dark navigation header with border-gray-800
+- Radial gradient overlays for visual depth
+- Orange glow shadows on CTAs (shadow-orange-500/25)
+- Clean, modern SaaS-grade aesthetic
+
 ## Upcoming Tasks (Backlog)
 - UI polish and enhanced frontend refactoring
 - AI module integration (ticket summarization, categorization, suggested replies)
