@@ -2011,6 +2011,9 @@ async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(
     # Get updated ticket with SLA info
     updated_ticket = await db.tickets.find_one({"id": ticket.id}, {"_id": 0})
     
+    # Send notifications for ticket creation
+    asyncio.create_task(notify_ticket_created(updated_ticket, current_user))
+    
     # Convert datetime strings back to objects for response
     for field in ['created_at', 'updated_at', 'response_due_at', 'resolution_due_at', 'first_response_at']:
         if updated_ticket.get(field) and isinstance(updated_ticket[field], str):
