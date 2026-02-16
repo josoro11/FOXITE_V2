@@ -2250,6 +2250,71 @@ async def list_client_companies(current_user: dict = Depends(get_current_user)):
     
     return companies
 
+@api_router.get("/client-companies/{company_id}")
+async def get_client_company(company_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a specific client company"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    company = await db.client_companies.find_one({"id": company_id, "organization_id": org_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    if isinstance(company.get('created_at'), str):
+        company['created_at'] = datetime.fromisoformat(company['created_at'])
+    
+    return company
+
+@api_router.patch("/client-companies/{company_id}")
+async def update_client_company(company_id: str, update_data: dict, current_user: dict = Depends(get_current_user)):
+    """Update a client company"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admin/supervisor can update companies")
+    
+    company = await db.client_companies.find_one({"id": company_id, "organization_id": org_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Filter allowed fields
+    allowed_fields = ['name', 'domain', 'industry', 'country', 'city', 'address', 'phone', 'contact_email', 'status', 'custom_fields_data']
+    update_dict = {k: v for k, v in update_data.items() if k in allowed_fields and v is not None}
+    
+    if update_dict:
+        await db.client_companies.update_one({"id": company_id}, {"$set": update_dict})
+        await log_audit(org_id, current_user['id'], "UPDATE", "company", company_id)
+    
+    updated = await db.client_companies.find_one({"id": company_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/client-companies/{company_id}")
+async def delete_client_company(company_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a client company"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admin/supervisor can delete companies")
+    
+    company = await db.client_companies.find_one({"id": company_id, "organization_id": org_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Check for linked end users
+    linked_users = await db.end_users.count_documents({"client_company_id": company_id})
+    if linked_users > 0:
+        raise HTTPException(status_code=400, detail=f"Cannot delete company with {linked_users} linked end users")
+    
+    await db.client_companies.delete_one({"id": company_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "company", company_id)
+    
+    return {"message": "Company deleted"}
+
 # ==================== END USER ROUTES ====================
 
 @api_router.post("/end-users", response_model=EndUser)
