@@ -50,11 +50,14 @@ PLAN_FEATURES = {
     "CORE": {
         "name": "CORE",
         "display_name": "Core",
-        "price": 25,
+        "price_per_seat": 18,
+        "min_seats": 3,
         "currency": "USD",
+        "yearly_discount": 0.15,
+        "max_slas": 1,
         # Resource limits - None means unlimited
         "limits": {
-            "staff_users": None,      # Unlimited
+            "staff_users": None,      # Controlled by seat_count
             "tickets": None,          # Unlimited
             "end_users": None,        # Unlimited
             "devices": 25,            # Limited to 25 devices
@@ -93,10 +96,13 @@ PLAN_FEATURES = {
     "PLUS": {
         "name": "PLUS",
         "display_name": "Plus",
-        "price": 55,
+        "price_per_seat": 55,
+        "min_seats": 3,
         "currency": "USD",
+        "yearly_discount": 0.15,
+        "max_slas": 3,
         "limits": {
-            "staff_users": None,       # Unlimited
+            "staff_users": None,       # Controlled by seat_count
             "tickets": None,           # Unlimited
             "end_users": None,         # Unlimited
             "devices": 100,            # Up to 100 devices
@@ -118,7 +124,7 @@ PLAN_FEATURES = {
             "ai_ticket_summary": True,
             "ai_response_suggestions": False,
             "sla_management": "advanced",
-            "reports": "advanced",
+            "reports": "full",
             "api_access": "read_only",
             "end_user_portal_customization": False,
             "workflows": True,
@@ -127,6 +133,55 @@ PLAN_FEATURES = {
             "custom_dashboards": False,
             "audit_logs": False,
             "alerts_escalations": "advanced",
+            "time_tracking": True,
+            "asset_linking": True,
+        }
+    },
+    "PRIME": {
+        "name": "PRIME",
+        "display_name": "Prime",
+        "price_per_seat": 100,
+        "min_seats": 1,
+        "currency": "USD",
+        "yearly_discount": 0.15,
+        "max_slas": None,  # Unlimited
+        "limits": {
+            "staff_users": None,        # Controlled by seat_count
+            "tickets": None,            # Unlimited
+            "end_users": None,          # Unlimited
+            "devices": None,            # Unlimited
+            "licenses": None,           # Unlimited
+            "saved_views": None,        # Unlimited
+            "automations": None,        # Unlimited
+            "ai_requests_monthly": None, # Unlimited
+        },
+        "features": {
+            "tickets": True,
+            "end_users": True,
+            "tasks": True,
+            "devices_inventory": True,
+            "licenses_inventory": True,
+            "knowledge_base": True,
+            "calendar": True,
+            "email_notifications": True,
+            "ai_features": "unlimited",
+            "ai_ticket_summary": True,
+            "ai_response_suggestions": True,
+            "sla_management": "advanced",
+            "reports": "full",
+            "api_access": "full",
+            "end_user_portal_customization": True,
+            "workflows": True,
+            "automation_rules": True,
+            "saved_filters": True,
+            "custom_dashboards": True,
+            "audit_logs": True,
+            "alerts_escalations": "advanced",
+            "time_tracking": True,
+            "asset_linking": True,
+        }
+    }
+}
             "time_tracking": True,
             "asset_linking": True,
         }
