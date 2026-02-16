@@ -3913,6 +3913,66 @@ async def list_tasks(
     
     return tasks
 
+@api_router.get("/tasks/{task_id}", response_model=Task)
+async def get_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a specific task"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    task = await db.tasks.find_one({"id": task_id, "organization_id": org_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    if isinstance(task.get('created_at'), str):
+        task['created_at'] = datetime.fromisoformat(task['created_at'])
+    if task.get('due_date') and isinstance(task.get('due_date'), str):
+        task['due_date'] = datetime.fromisoformat(task['due_date'])
+    
+    return task
+
+@api_router.patch("/tasks/{task_id}", response_model=Task)
+async def update_task(task_id: str, update_data: TaskUpdate, current_user: dict = Depends(get_current_user)):
+    """Update a task"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    task = await db.tasks.find_one({"id": task_id, "organization_id": org_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    
+    if update_dict:
+        await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
+        await log_audit(org_id, current_user['id'], "UPDATE", "task", task_id)
+    
+    updated = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if isinstance(updated.get('created_at'), str):
+        updated['created_at'] = datetime.fromisoformat(updated['created_at'])
+    
+    return updated
+
+@api_router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a task"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admin/supervisor can delete tasks")
+    
+    task = await db.tasks.find_one({"id": task_id, "organization_id": org_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    await db.tasks.delete_one({"id": task_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "task", task_id)
+    
+    return {"message": "Task deleted"}
+
 # ==================== DASHBOARD STATS ====================
 
 @api_router.get("/dashboard/stats")
