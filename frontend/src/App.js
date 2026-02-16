@@ -3266,7 +3266,7 @@ const CompaniesPage = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {companies.map((c) => (
-            <Card key={c.id} className="hover:shadow-md transition-shadow">
+            <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/companies/${c.id}`)}>
               <CardContent className="py-4">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0"><Building2 size={20} className="text-indigo-600" /></div>
