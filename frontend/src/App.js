@@ -3259,6 +3259,7 @@ const CompaniesPage = () => {
                 <div><label className="text-sm font-medium">Phone</label><Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
               </div>
               <div><label className="text-sm font-medium">Address</label><Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+              <CustomFieldsRenderer entityType="company" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
               <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-company-btn">Create</Button></div>
             </form>
           </CardContent>
