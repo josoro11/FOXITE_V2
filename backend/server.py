@@ -216,6 +216,121 @@ class FeatureNotAvailableError(HTTPException):
         }
         super().__init__(status_code=403, detail=detail)
 
+class SeatLimitExceededError(HTTPException):
+    """Custom exception for seat limit exceeded"""
+    def __init__(self, current_users: int, seat_count: int):
+        detail = {
+            "error": "seat_limit_exceeded",
+            "current_users": current_users,
+            "seat_count": seat_count,
+            "message": f"Cannot add more users. You have {current_users} users but only {seat_count} seats. Please increase your seat count.",
+            "upgrade_url": "/settings/billing"
+        }
+        super().__init__(status_code=403, detail=detail)
+
+class OrganizationSuspendedError(HTTPException):
+    """Custom exception for suspended organization"""
+    def __init__(self):
+        detail = {
+            "error": "organization_suspended",
+            "message": "Your organization is currently suspended. Please contact support or update your billing information.",
+            "upgrade_url": "/settings/billing"
+        }
+        super().__init__(status_code=403, detail=detail)
+
+# ==================== PRICING & BILLING HELPERS ====================
+
+def calculate_pricing(plan_id: str, seat_count: int, billing_cycle: str) -> dict:
+    """Calculate pricing for a plan with seat count and billing cycle"""
+    plan = PLAN_FEATURES.get(plan_id, PLAN_FEATURES["CORE"])
+    price_per_seat = plan.get("price_per_seat", 18)
+    min_seats = plan.get("min_seats", 3)
+    yearly_discount = plan.get("yearly_discount", 0.15)
+    
+    # Ensure minimum seats
+    effective_seats = max(seat_count, min_seats)
+    
+    # Calculate monthly price
+    monthly_total = price_per_seat * effective_seats
+    
+    # Calculate yearly price with discount
+    yearly_total = monthly_total * 12 * (1 - yearly_discount)
+    
+    if billing_cycle == BillingCycle.YEARLY:
+        effective_monthly = yearly_total / 12
+        total_price = yearly_total
+        savings = (monthly_total * 12) - yearly_total
+    else:
+        effective_monthly = monthly_total
+        total_price = monthly_total
+        savings = 0
+    
+    return {
+        "plan_id": plan_id,
+        "plan_name": plan.get("display_name", plan_id),
+        "price_per_seat": price_per_seat,
+        "seat_count": effective_seats,
+        "min_seats": min_seats,
+        "billing_cycle": billing_cycle,
+        "monthly_subtotal": monthly_total,
+        "yearly_discount_percent": int(yearly_discount * 100),
+        "effective_monthly": round(effective_monthly, 2),
+        "total_price": round(total_price, 2),
+        "savings": round(savings, 2),
+        "currency": plan.get("currency", "USD")
+    }
+
+async def check_seat_availability(org_id: str, exclude_user_id: str = None) -> dict:
+    """Check if organization has available seats"""
+    org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    seat_count = org.get("seat_count", 3)
+    
+    # Count current active staff users
+    query = {"organization_id": org_id, "status": "active"}
+    if exclude_user_id:
+        query["id"] = {"$ne": exclude_user_id}
+    current_users = await db.staff_users.count_documents(query)
+    
+    return {
+        "seat_count": seat_count,
+        "current_users": current_users,
+        "available_seats": max(0, seat_count - current_users),
+        "can_add_user": current_users < seat_count
+    }
+
+async def check_org_suspended(org_id: str) -> bool:
+    """Check if organization is suspended"""
+    org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    return org.get("status") == OrgStatus.SUSPENDED
+
+async def enforce_not_suspended(org_id: str):
+    """Raise error if organization is suspended"""
+    if await check_org_suspended(org_id):
+        raise OrganizationSuspendedError()
+
+async def check_sla_limit(org_id: str) -> dict:
+    """Check SLA limit for organization based on plan"""
+    org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    plan_id = org.get("plan", "CORE")
+    plan = PLAN_FEATURES.get(plan_id, PLAN_FEATURES["CORE"])
+    max_slas = plan.get("max_slas")
+    
+    current_slas = await db.sla_policies.count_documents({"organization_id": org_id})
+    
+    return {
+        "max_slas": max_slas,
+        "current_slas": current_slas,
+        "can_add_sla": max_slas is None or current_slas < max_slas
+    }
+
 # ==================== FEATURE GATING SYSTEM ====================
 
 async def get_plan_limits(org_id: str) -> Dict[str, Any]:
