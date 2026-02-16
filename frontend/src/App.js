@@ -973,6 +973,7 @@ const SettingsPage = () => {
   const settingsSections = [
     { id: 'organization', icon: Building2, label: 'Organization', path: '/settings/organization' },
     { id: 'billing', icon: CreditCard, label: 'Billing & Seats', path: '/settings/billing' },
+    { id: 'custom-fields', icon: Sliders, label: 'Custom Fields', path: '/settings/custom-fields' },
     { id: 'business-hours', icon: Clock, label: 'Business Hours', path: '/settings/business-hours' },
     { id: 'sla', icon: Shield, label: 'SLA Policies', path: '/settings/sla' },
     { id: 'notifications', icon: Bell, label: 'Notifications', path: '/settings/notifications', badge: 'Coming Soon' },
