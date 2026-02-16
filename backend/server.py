@@ -1968,18 +1968,94 @@ async def get_organization_usage(org_id: str, current_user: dict = Depends(get_c
 @api_router.get("/plans")
 async def get_available_plans():
     """Get all available subscription plans (public endpoint)"""
-    # Return plan info without internal implementation details
     plans = []
     for plan_id, plan in PLAN_FEATURES.items():
         plans.append({
             "id": plan_id,
             "name": plan.get("display_name", plan_id),
-            "price": plan.get("price"),
+            "price_per_seat": plan.get("price_per_seat"),
+            "min_seats": plan.get("min_seats", 1),
+            "yearly_discount": plan.get("yearly_discount", 0.15),
+            "max_slas": plan.get("max_slas"),
             "currency": plan.get("currency", "USD"),
             "limits": plan.get("limits", {}),
             "features": plan.get("features", {})
         })
     return plans
+
+@api_router.get("/pricing/calculate")
+async def calculate_plan_pricing(plan: str = "CORE", seats: int = 3, billing: str = "monthly"):
+    """Calculate pricing for a plan configuration (public endpoint)"""
+    if plan not in PLAN_FEATURES:
+        raise HTTPException(status_code=400, detail="Invalid plan")
+    if billing not in [BillingCycle.MONTHLY, BillingCycle.YEARLY]:
+        raise HTTPException(status_code=400, detail="Invalid billing cycle")
+    return calculate_pricing(plan, seats, billing)
+
+@api_router.get("/organization/billing")
+async def get_organization_billing(current_user: dict = Depends(get_current_user)):
+    """Get billing information for current organization"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Owner account has no billing")
+    
+    org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    plan_id = org.get("plan", "CORE")
+    billing_cycle = org.get("billing_cycle", BillingCycle.MONTHLY)
+    seat_count = org.get("seat_count", 3)
+    
+    # Get pricing info
+    pricing = calculate_pricing(plan_id, seat_count, billing_cycle)
+    
+    # Get seat usage
+    seat_info = await check_seat_availability(org_id)
+    
+    # Get SLA usage
+    sla_info = await check_sla_limit(org_id)
+    
+    return {
+        "organization_id": org_id,
+        "organization_name": org.get("name"),
+        "status": org.get("status", "active"),
+        "trial_ends_at": org.get("trial_ends_at"),
+        "pricing": pricing,
+        "seats": seat_info,
+        "sla_limits": sla_info
+    }
+
+@api_router.patch("/organization/seats")
+async def update_organization_seats(seat_count: int, current_user: dict = Depends(get_current_user)):
+    """Update seat count for organization (Admin only)"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    
+    if current_user.get('role') not in [UserRole.ADMIN]:
+        raise HTTPException(status_code=403, detail="Only admins can modify seats")
+    
+    org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    plan_id = org.get("plan", "CORE")
+    plan = PLAN_FEATURES.get(plan_id, PLAN_FEATURES["CORE"])
+    min_seats = plan.get("min_seats", 3)
+    
+    # Validate minimum seats
+    if seat_count < min_seats:
+        raise HTTPException(status_code=400, detail=f"{plan_id} plan requires minimum {min_seats} seats")
+    
+    # Check current users don't exceed new seat count
+    current_users = await db.staff_users.count_documents({"organization_id": org_id, "status": "active"})
+    if seat_count < current_users:
+        raise HTTPException(status_code=400, detail=f"Cannot reduce seats below current user count ({current_users})")
+    
+    await db.organizations.update_one({"id": org_id}, {"$set": {"seat_count": seat_count}})
+    
+    return {"message": "Seat count updated", "seat_count": seat_count}
 
 # ==================== STAFF USER ROUTES ====================
 
