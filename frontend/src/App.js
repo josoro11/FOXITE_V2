@@ -822,7 +822,6 @@ const DashboardLayout = ({ children }) => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { icon: Ticket, label: 'Tickets', path: '/tickets' },
     { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
-    { icon: Clock, label: 'Time Tracking', path: '/sessions' },
     { icon: Users, label: 'End Users', path: '/end-users' },
     { icon: Monitor, label: 'Devices', path: '/devices' },
     { icon: Package, label: 'Licenses', path: '/licenses' },
