@@ -390,6 +390,37 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - Tab badges showing counts (Tasks, Devices)
 - Clean modern UI with consistent styling
 
+### Phase 5D: Custom Fields & Attachments Engine (✅ Complete - Feb 16, 2026)
+**CustomField Model:**
+- organizationId, entityType, label, fieldType, required, options, active, order
+- Supported entity types: ticket, device, company, end_user, license, task
+- Supported field types: text, number, date, boolean, dropdown, file
+
+**Entity Updates (custom_fields_data JSON field added):**
+- Ticket, Device, ClientCompany, EndUser, License, Task
+
+**Custom Fields Management UI (Settings > Custom Fields):**
+- Entity type tabs (Tickets, Devices, Companies, End Users, Licenses, Tasks)
+- Create/Edit/Delete custom fields
+- Activate/Deactivate fields
+- Reorder fields with up/down arrows
+- Field type icons and validation
+
+**Attachments System:**
+- Generic Attachment model: entityType, entityId, fileUrl, fileName, uploadedBy
+- Supports: Tickets, Devices, Companies, End Users, Licenses
+- Upload/Delete with role protection
+
+**API Endpoints:**
+- GET/POST /api/custom-fields - List and create fields
+- PATCH/DELETE /api/custom-fields/{id} - Update and delete
+- POST /api/custom-fields/reorder - Reorder fields
+- GET/POST/DELETE /api/attachments - Manage attachments
+
+**Role Protection:**
+- Admin/Supervisor: Full CRUD on custom fields
+- Technicians: Read-only (can use fields but not manage them)
+
 ## Upcoming Tasks (Backlog)
 - UI polish and enhanced frontend refactoring
 - AI module integration (ticket summarization, categorization, suggested replies)
