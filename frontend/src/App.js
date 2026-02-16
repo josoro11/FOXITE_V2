@@ -2804,7 +2804,7 @@ const TasksPage = () => {
       ) : (
         <div className="space-y-3">
           {tasks.map((task) => (
-            <Card key={task.id} className="hover:shadow-md transition-shadow">
+            <Card key={task.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/tasks/${task.id}`)}>
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -2816,7 +2816,7 @@ const TasksPage = () => {
                     </div>
                   </div>
                   {canEdit && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                       <Button variant="ghost" size="sm" onClick={() => startEdit(task)}><Edit size={16} /></Button>
                       <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => deleteTask(task.id)}><Trash2 size={16} /></Button>
                     </div>
