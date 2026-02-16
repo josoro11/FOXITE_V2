@@ -4051,11 +4051,16 @@ function App() {
                   <Route path="/tickets" element={<TicketsPage />} />
                   <Route path="/tickets/:id" element={<TicketDetailPage />} />
                   <Route path="/tasks" element={<TasksPage />} />
+                  <Route path="/tasks/:id" element={<TaskDetailPage />} />
                   <Route path="/sessions" element={<SessionsPage />} />
                   <Route path="/end-users" element={<EndUsersPage />} />
+                  <Route path="/end-users/:id" element={<EndUserDetailPage />} />
                   <Route path="/devices" element={<DevicesPage />} />
+                  <Route path="/devices/:id" element={<DeviceDetailPage />} />
                   <Route path="/licenses" element={<LicensesPage />} />
+                  <Route path="/licenses/:id" element={<LicenseDetailPage />} />
                   <Route path="/companies" element={<CompaniesPage />} />
+                  <Route path="/companies/:id" element={<CompanyDetailPage />} />
                   <Route path="/saved-views" element={<SavedViewsPage />} />
                   <Route path="/settings/*" element={<SettingsPage />} />
                   <Route path="*" element={<Navigate to="/dashboard" />} />
