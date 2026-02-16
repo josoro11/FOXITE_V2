@@ -3063,7 +3063,7 @@ const DevicesPage = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {devices.map((d) => (
-            <Card key={d.id} className="hover:shadow-md transition-shadow">
+            <Card key={d.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/devices/${d.id}`)}>
               <CardContent className="py-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
@@ -3076,7 +3076,7 @@ const DevicesPage = () => {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge className={statusColors[d.status]}>{d.status}</Badge>
-                    {canEdit && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteDevice(d.id)}><Trash2 size={14} /></Button>}
+                    {canEdit && <Button variant="ghost" size="sm" className="text-red-600" onClick={e => { e.stopPropagation(); deleteDevice(d.id); }}><Trash2 size={14} /></Button>}
                   </div>
                 </div>
               </CardContent>
