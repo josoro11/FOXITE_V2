@@ -3233,7 +3233,7 @@ const CompaniesPage = () => {
       await axios.post(`${API_URL}/client-companies`, formData, { headers: { Authorization: `Bearer ${token}` } });
       toast.success('Company created');
       setShowCreate(false);
-      setFormData({ name: '', domain: '', industry: '', phone: '', address: '' });
+      setFormData({ name: '', domain: '', industry: '', phone: '', address: '', custom_fields_data: {} });
       fetchCompanies();
     } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
   };
