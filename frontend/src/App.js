@@ -2753,7 +2753,7 @@ const TasksPage = () => {
       }
       setShowCreate(false);
       setEditingTask(null);
-      setFormData({ title: '', description: '', priority: 'medium', status: 'pending' });
+      setFormData({ title: '', description: '', priority: 'medium', status: 'pending', custom_fields_data: {} });
       fetchTasks();
     } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
   };
@@ -2769,7 +2769,7 @@ const TasksPage = () => {
 
   const startEdit = (task) => {
     setEditingTask(task);
-    setFormData({ title: task.title, description: task.description || '', priority: task.priority, status: task.status });
+    setFormData({ title: task.title, description: task.description || '', priority: task.priority, status: task.status, custom_fields_data: task.custom_fields_data || {} });
     setShowCreate(true);
   };
 
