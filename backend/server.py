@@ -182,52 +182,11 @@ PLAN_FEATURES = {
         }
     }
 }
-            "time_tracking": True,
-            "asset_linking": True,
-        }
-    },
-    "PRIME": {
-        "name": "PRIME",
-        "display_name": "Prime (Pro)",
-        "price": 90,
-        "currency": "USD",
-        "limits": {
-            "staff_users": None,        # Unlimited
-            "tickets": None,            # Unlimited
-            "end_users": None,          # Unlimited
-            "devices": None,            # Unlimited
-            "licenses": None,           # Unlimited
-            "saved_views": None,        # Unlimited
-            "automations": None,        # Unlimited
-            "ai_requests_monthly": None, # Unlimited
-        },
-        "features": {
-            "tickets": True,
-            "end_users": True,
-            "tasks": True,
-            "devices_inventory": True,
-            "licenses_inventory": True,
-            "knowledge_base": True,
-            "calendar": True,
-            "email_notifications": True,
-            "ai_features": "unlimited",
-            "ai_ticket_summary": True,
-            "ai_response_suggestions": True,
-            "sla_management": "advanced",
-            "reports": "advanced",
-            "api_access": "full",
-            "end_user_portal_customization": True,
-            "workflows": True,
-            "automation_rules": True,
-            "saved_filters": True,
-            "custom_dashboards": True,
-            "audit_logs": True,
-            "alerts_escalations": "advanced",
-            "time_tracking": True,
-            "asset_linking": True,
-        }
-    }
-}
+
+# Billing cycle options
+class BillingCycle(str):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
 
 # ==================== PLAN ENFORCEMENT ERRORS ====================
 
