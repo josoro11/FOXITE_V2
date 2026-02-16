@@ -3054,6 +3054,7 @@ const DevicesPage = () => {
                 <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="active">Active</option><option value="inactive">Inactive</option><option value="maintenance">Maintenance</option><option value="retired">Retired</option></select></div>
                 <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={(e) => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- Select --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
               </div>
+              <CustomFieldsRenderer entityType="device" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
               <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-device-btn">Create</Button></div>
             </form>
           </CardContent>
