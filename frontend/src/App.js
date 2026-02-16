@@ -2894,7 +2894,7 @@ const EndUsersPage = () => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', client_company_id: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', client_company_id: '', custom_fields_data: {} });
 
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
 
