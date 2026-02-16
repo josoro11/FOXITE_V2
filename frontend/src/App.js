@@ -7,7 +7,8 @@ import {
   Filter, Play, Square, AlertTriangle, Calendar, RefreshCw, Trash2, Edit, Eye,
   Shield, TrendingUp, AlertCircle, Package, Settings, Bell, ChevronRight, Zap,
   Globe, Mail, Check, Star, ArrowRight, Headphones, BarChart3, Users2, Layers,
-  PlayCircle, StopCircle, Save, UserPlus, Building, Key, CreditCard
+  PlayCircle, StopCircle, Save, UserPlus, Building, Key, CreditCard, Sliders, Paperclip,
+  Upload, File, ToggleLeft, Hash, Type, ChevronUp
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
