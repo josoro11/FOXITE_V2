@@ -3385,6 +3385,630 @@ const SavedViewsPage = () => {
   );
 };
 
+// ==================== CUSTOM FIELDS RENDERER ====================
+
+const CustomFieldsRenderer = ({ entityType, fieldsData = {}, onChange, readOnly = false }) => {
+  const { token } = useAuth();
+  const [fields, setFields] = useState([]);
+  useEffect(() => {
+    const fetchFields = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/custom-fields?entity_type=${entityType}`, { headers: { Authorization: `Bearer ${token}` } });
+        setFields((res.data || []).filter(f => f.active));
+      } catch (e) {}
+    };
+    fetchFields();
+  }, [entityType, token]);
+
+  if (fields.length === 0) return null;
+
+  const handleChange = (fieldId, value) => {
+    onChange({ ...fieldsData, [fieldId]: value });
+  };
+
+  return (
+    <div className="space-y-3" data-testid="custom-fields-section">
+      <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Custom Fields</h4>
+      <div className="grid grid-cols-2 gap-4">
+        {fields.map(field => (
+          <div key={field.id}>
+            <label className="text-sm font-medium">{field.label}{field.required && ' *'}</label>
+            {readOnly ? (
+              <p className="text-sm text-gray-700 mt-1" data-testid={`cf-display-${field.id}`}>
+                {field.field_type === 'boolean' ? (fieldsData[field.id] ? 'Yes' : 'No') : (fieldsData[field.id] || '—')}
+              </p>
+            ) : field.field_type === 'text' ? (
+              <Input value={fieldsData[field.id] || ''} onChange={e => handleChange(field.id, e.target.value)} data-testid={`cf-${field.id}`} />
+            ) : field.field_type === 'number' ? (
+              <Input type="number" value={fieldsData[field.id] || ''} onChange={e => handleChange(field.id, e.target.value)} data-testid={`cf-${field.id}`} />
+            ) : field.field_type === 'date' ? (
+              <Input type="date" value={fieldsData[field.id] || ''} onChange={e => handleChange(field.id, e.target.value)} data-testid={`cf-${field.id}`} />
+            ) : field.field_type === 'boolean' ? (
+              <div className="mt-1"><input type="checkbox" checked={!!fieldsData[field.id]} onChange={e => handleChange(field.id, e.target.checked)} data-testid={`cf-${field.id}`} className="w-4 h-4" /></div>
+            ) : field.field_type === 'dropdown' ? (
+              <select className="w-full border rounded-md p-2 text-sm" value={fieldsData[field.id] || ''} onChange={e => handleChange(field.id, e.target.value)} data-testid={`cf-${field.id}`}>
+                <option value="">-- Select --</option>
+                {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            ) : (
+              <Input value={fieldsData[field.id] || ''} onChange={e => handleChange(field.id, e.target.value)} data-testid={`cf-${field.id}`} />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ==================== TASK DETAIL PAGE ====================
+
+const TaskDetailPage = () => {
+  const { id } = useParams();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const [task, setTask] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [staffUsers, setStaffUsers] = useState([]);
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+  const priorityColors = { low: 'bg-gray-100 text-gray-700', medium: 'bg-blue-100 text-blue-700', high: 'bg-orange-100 text-orange-700', urgent: 'bg-red-100 text-red-700' };
+  const statusColors = { pending: 'bg-yellow-100 text-yellow-700', in_progress: 'bg-blue-100 text-blue-700', completed: 'bg-green-100 text-green-700', cancelled: 'bg-gray-100 text-gray-700' };
+
+  useEffect(() => { fetchTask(); fetchStaff(); }, [id]);
+
+  const fetchTask = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setTask(res.data);
+      setFormData({ title: res.data.title, description: res.data.description || '', priority: res.data.priority, status: res.data.status, due_date: res.data.due_date?.slice(0, 10) || '', assigned_staff_id: res.data.assigned_staff_id || '', custom_fields_data: res.data.custom_fields_data || {} });
+    } catch (e) { toast.error('Task not found'); navigate('/tasks'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchStaff = async () => {
+    try { const res = await axios.get(`${API_URL}/staff-users`, { headers: { Authorization: `Bearer ${token}` } }); setStaffUsers(res.data || []); } catch (e) {}
+  };
+
+  const handleSave = async () => {
+    try {
+      const submitData = { ...formData };
+      if (!submitData.due_date) delete submitData.due_date;
+      if (!submitData.assigned_staff_id) delete submitData.assigned_staff_id;
+      await axios.patch(`${API_URL}/tasks/${id}`, submitData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Task updated');
+      setEditing(false);
+      fetchTask();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed to update'); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this task?')) return;
+    try { await axios.delete(`${API_URL}/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } }); toast.success('Deleted'); navigate('/tasks'); } catch (e) { toast.error('Failed'); }
+  };
+
+  if (loading) return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>;
+  if (!task) return null;
+
+  return (
+    <div className="p-6 max-w-4xl" data-testid="task-detail-page">
+      <div className="flex items-center gap-2 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/tasks')} data-testid="back-to-tasks-btn"><ArrowLeft size={16} className="mr-1" /> Tasks</Button>
+      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-xl">{task.title}</CardTitle>
+              <div className="flex gap-2 mt-2">
+                <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
+                <Badge className={statusColors[task.status]}>{task.status?.replace('_', ' ')}</Badge>
+              </div>
+            </div>
+            {canEdit && !editing && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="edit-task-btn"><Edit size={14} className="mr-1" /> Edit</Button>
+                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={handleDelete} data-testid="delete-task-btn"><Trash2 size={14} className="mr-1" /> Delete</Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {editing ? (
+            <div className="space-y-4">
+              <div><label className="text-sm font-medium">Title *</label><Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} data-testid="edit-task-title" /></div>
+              <div><label className="text-sm font-medium">Description</label><textarea className="w-full border rounded-md p-2 text-sm min-h-[80px]" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Priority</label><select className="w-full border rounded-md p-2" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+                <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Due Date</label><Input type="date" value={formData.due_date} onChange={e => setFormData({ ...formData, due_date: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Assigned To</label><select className="w-full border rounded-md p-2" value={formData.assigned_staff_id} onChange={e => setFormData({ ...formData, assigned_staff_id: e.target.value })}><option value="">-- Unassigned --</option>{staffUsers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+              </div>
+              <CustomFieldsRenderer entityType="task" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
+              <div className="flex gap-2 justify-end"><Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button><Button className="bg-orange-500 hover:bg-orange-600" onClick={handleSave} data-testid="save-task-btn">Save Changes</Button></div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {task.description && <div><label className="text-sm font-medium text-gray-500">Description</label><p className="mt-1">{task.description}</p></div>}
+              <div className="grid grid-cols-2 gap-4">
+                {task.due_date && <div><label className="text-sm font-medium text-gray-500">Due Date</label><p className="mt-1">{formatDate(task.due_date)}</p></div>}
+                {task.assigned_staff_id && <div><label className="text-sm font-medium text-gray-500">Assigned To</label><p className="mt-1">{staffUsers.find(s => s.id === task.assigned_staff_id)?.name || task.assigned_staff_id}</p></div>}
+                {task.ticket_id && <div><label className="text-sm font-medium text-gray-500">Linked Ticket</label><Link to={`/tickets/${task.ticket_id}`} className="text-orange-600 hover:underline mt-1 block">{task.ticket_id}</Link></div>}
+                <div><label className="text-sm font-medium text-gray-500">Created</label><p className="mt-1">{formatDateTime(task.created_at)}</p></div>
+              </div>
+              <CustomFieldsRenderer entityType="task" fieldsData={task.custom_fields_data || {}} onChange={() => {}} readOnly />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// ==================== DEVICE DETAIL PAGE ====================
+
+const DeviceDetailPage = () => {
+  const { id } = useParams();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const [device, setDevice] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [companies, setCompanies] = useState([]);
+  const [endUsers, setEndUsers] = useState([]);
+  const [linkedTickets, setLinkedTickets] = useState([]);
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+  const statusColors = { active: 'bg-green-100 text-green-700', inactive: 'bg-gray-100 text-gray-700', maintenance: 'bg-yellow-100 text-yellow-700', retired: 'bg-red-100 text-red-700' };
+
+  useEffect(() => { fetchDevice(); fetchCompanies(); fetchEndUsers(); }, [id]);
+
+  const fetchDevice = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/devices/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setDevice(res.data);
+      setFormData({ name: res.data.name, device_type: res.data.device_type, manufacturer: res.data.manufacturer || '', model: res.data.model || '', serial_number: res.data.serial_number || '', os_type: res.data.os_type || '', os_version: res.data.os_version || '', assigned_to: res.data.assigned_to || '', status: res.data.status, client_company_id: res.data.client_company_id || '', notes: res.data.notes || '', custom_fields_data: res.data.custom_fields_data || {} });
+      try { const t = await axios.get(`${API_URL}/devices/${id}/tickets`, { headers: { Authorization: `Bearer ${token}` } }); setLinkedTickets(t.data || []); } catch (e) {}
+    } catch (e) { toast.error('Device not found'); navigate('/devices'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchCompanies = async () => { try { const r = await axios.get(`${API_URL}/client-companies`, { headers: { Authorization: `Bearer ${token}` } }); setCompanies(r.data || []); } catch (e) {} };
+  const fetchEndUsers = async () => { try { const r = await axios.get(`${API_URL}/end-users`, { headers: { Authorization: `Bearer ${token}` } }); setEndUsers(r.data || []); } catch (e) {} };
+
+  const handleSave = async () => {
+    try {
+      const submitData = { ...formData };
+      if (!submitData.assigned_to) delete submitData.assigned_to;
+      if (!submitData.client_company_id) delete submitData.client_company_id;
+      await axios.patch(`${API_URL}/devices/${id}`, submitData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Device updated');
+      setEditing(false);
+      fetchDevice();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed to update'); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this device?')) return;
+    try { await axios.delete(`${API_URL}/devices/${id}`, { headers: { Authorization: `Bearer ${token}` } }); toast.success('Deleted'); navigate('/devices'); } catch (e) { toast.error('Failed'); }
+  };
+
+  if (loading) return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>;
+  if (!device) return null;
+
+  return (
+    <div className="p-6 max-w-4xl" data-testid="device-detail-page">
+      <div className="flex items-center gap-2 mb-6"><Button variant="ghost" size="sm" onClick={() => navigate('/devices')} data-testid="back-to-devices-btn"><ArrowLeft size={16} className="mr-1" /> Devices</Button></div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><Monitor size={24} className="text-blue-600" /></div>
+              <div><CardTitle className="text-xl">{device.name}</CardTitle><div className="flex gap-2 mt-1"><Badge className={statusColors[device.status]}>{device.status}</Badge><Badge variant="outline">{device.device_type}</Badge></div></div>
+            </div>
+            {canEdit && !editing && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="edit-device-btn"><Edit size={14} className="mr-1" /> Edit</Button>
+                <Button variant="outline" size="sm" className="text-red-600" onClick={handleDelete} data-testid="delete-device-btn"><Trash2 size={14} className="mr-1" /> Delete</Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {editing ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} data-testid="edit-device-name" /></div>
+                <div><label className="text-sm font-medium">Type</label><select className="w-full border rounded-md p-2" value={formData.device_type} onChange={e => setFormData({ ...formData, device_type: e.target.value })}><option value="desktop">Desktop</option><option value="laptop">Laptop</option><option value="server">Server</option><option value="printer">Printer</option><option value="network">Network</option><option value="mobile">Mobile</option><option value="other">Other</option></select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Manufacturer</label><Input value={formData.manufacturer} onChange={e => setFormData({ ...formData, manufacturer: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Model</label><Input value={formData.model} onChange={e => setFormData({ ...formData, model: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Serial Number</label><Input value={formData.serial_number} onChange={e => setFormData({ ...formData, serial_number: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}><option value="active">Active</option><option value="inactive">Inactive</option><option value="maintenance">Maintenance</option><option value="retired">Retired</option></select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">OS</label><Input value={formData.os_type} onChange={e => setFormData({ ...formData, os_type: e.target.value })} placeholder="e.g. Windows" /></div>
+                <div><label className="text-sm font-medium">OS Version</label><Input value={formData.os_version} onChange={e => setFormData({ ...formData, os_version: e.target.value })} placeholder="e.g. 11" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={e => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- None --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                <div><label className="text-sm font-medium">Assigned User</label><select className="w-full border rounded-md p-2" value={formData.assigned_to} onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}><option value="">-- None --</option>{endUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+              </div>
+              <div><label className="text-sm font-medium">Notes</label><textarea className="w-full border rounded-md p-2 text-sm min-h-[60px]" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} /></div>
+              <CustomFieldsRenderer entityType="device" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
+              <div className="flex gap-2 justify-end"><Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button><Button className="bg-orange-500 hover:bg-orange-600" onClick={handleSave} data-testid="save-device-btn">Save Changes</Button></div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div><label className="text-sm font-medium text-gray-500">Serial Number</label><p className="mt-1">{device.serial_number || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Manufacturer</label><p className="mt-1">{device.manufacturer || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Model</label><p className="mt-1">{device.model || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">OS</label><p className="mt-1">{device.os_type ? `${device.os_type} ${device.os_version || ''}` : '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Company</label><p className="mt-1">{companies.find(c => c.id === device.client_company_id)?.name || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Assigned To</label><p className="mt-1">{endUsers.find(u => u.id === device.assigned_to)?.name || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Created</label><p className="mt-1">{formatDateTime(device.created_at)}</p></div>
+              </div>
+              {device.notes && <div><label className="text-sm font-medium text-gray-500">Notes</label><p className="mt-1 text-gray-700">{device.notes}</p></div>}
+              <CustomFieldsRenderer entityType="device" fieldsData={device.custom_fields_data || {}} onChange={() => {}} readOnly />
+              {linkedTickets.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Linked Tickets ({linkedTickets.length})</h4>
+                  <div className="space-y-2">{linkedTickets.map(t => (
+                    <Link key={t.id} to={`/tickets/${t.id}`} className="block p-2 border rounded hover:bg-gray-50"><span className="font-medium">#{t.ticket_number}</span> <span className="text-gray-600">{t.title}</span></Link>
+                  ))}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// ==================== LICENSE DETAIL PAGE ====================
+
+const LicenseDetailPage = () => {
+  const { id } = useParams();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const [license, setLicense] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [companies, setCompanies] = useState([]);
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchLicense(); fetchCompanies(); }, [id]);
+
+  const fetchLicense = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/licenses/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setLicense(res.data);
+      setFormData({ name: res.data.name, license_type: res.data.license_type, provider: res.data.provider || '', license_key: res.data.license_key || '', seats_total: res.data.seats_total || 1, expiration_date: res.data.expiration_date?.slice(0, 10) || '', renewal_cost: res.data.renewal_cost || '', billing_cycle: res.data.billing_cycle || '', status: res.data.status, client_company_id: res.data.client_company_id || '', notes: res.data.notes || '', custom_fields_data: res.data.custom_fields_data || {} });
+    } catch (e) { toast.error('License not found'); navigate('/licenses'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchCompanies = async () => { try { const r = await axios.get(`${API_URL}/client-companies`, { headers: { Authorization: `Bearer ${token}` } }); setCompanies(r.data || []); } catch (e) {} };
+
+  const handleSave = async () => {
+    try {
+      const submitData = { ...formData };
+      if (!submitData.expiration_date) delete submitData.expiration_date;
+      if (!submitData.client_company_id) delete submitData.client_company_id;
+      if (submitData.renewal_cost === '') delete submitData.renewal_cost;
+      else submitData.renewal_cost = parseFloat(submitData.renewal_cost);
+      await axios.patch(`${API_URL}/licenses/${id}`, submitData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('License updated');
+      setEditing(false);
+      fetchLicense();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed to update'); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this license?')) return;
+    try { await axios.delete(`${API_URL}/licenses/${id}`, { headers: { Authorization: `Bearer ${token}` } }); toast.success('Deleted'); navigate('/licenses'); } catch (e) { toast.error('Failed'); }
+  };
+
+  if (loading) return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>;
+  if (!license) return null;
+
+  return (
+    <div className="p-6 max-w-4xl" data-testid="license-detail-page">
+      <div className="flex items-center gap-2 mb-6"><Button variant="ghost" size="sm" onClick={() => navigate('/licenses')} data-testid="back-to-licenses-btn"><ArrowLeft size={16} className="mr-1" /> Licenses</Button></div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${license.expired ? 'bg-red-100' : 'bg-purple-100'}`}><Key size={24} className={license.expired ? 'text-red-600' : 'text-purple-600'} /></div>
+              <div><CardTitle className="text-xl">{license.name}</CardTitle><div className="flex gap-2 mt-1"><Badge className={license.expired ? 'bg-red-100 text-red-700' : license.expiring_soon ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}>{license.expired ? 'Expired' : license.expiring_soon ? 'Expiring Soon' : 'Active'}</Badge><Badge variant="outline">{license.license_type}</Badge></div></div>
+            </div>
+            {canEdit && !editing && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="edit-license-btn"><Edit size={14} className="mr-1" /> Edit</Button>
+                <Button variant="outline" size="sm" className="text-red-600" onClick={handleDelete} data-testid="delete-license-btn"><Trash2 size={14} className="mr-1" /> Delete</Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {editing ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} data-testid="edit-license-name" /></div>
+                <div><label className="text-sm font-medium">Type</label><select className="w-full border rounded-md p-2" value={formData.license_type} onChange={e => setFormData({ ...formData, license_type: e.target.value })}><option value="perpetual">Perpetual</option><option value="subscription">Subscription</option><option value="trial">Trial</option></select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Provider</label><Input value={formData.provider} onChange={e => setFormData({ ...formData, provider: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">License Key</label><Input value={formData.license_key} onChange={e => setFormData({ ...formData, license_key: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className="text-sm font-medium">Seats</label><Input type="number" min="1" value={formData.seats_total} onChange={e => setFormData({ ...formData, seats_total: parseInt(e.target.value) || 1 })} /></div>
+                <div><label className="text-sm font-medium">Expiration</label><Input type="date" value={formData.expiration_date} onChange={e => setFormData({ ...formData, expiration_date: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}><option value="active">Active</option><option value="inactive">Inactive</option><option value="expired">Expired</option></select></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className="text-sm font-medium">Renewal Cost</label><Input type="number" step="0.01" value={formData.renewal_cost} onChange={e => setFormData({ ...formData, renewal_cost: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Billing Cycle</label><select className="w-full border rounded-md p-2" value={formData.billing_cycle} onChange={e => setFormData({ ...formData, billing_cycle: e.target.value })}><option value="">-- None --</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="one-time">One-time</option></select></div>
+                <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={e => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- None --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              </div>
+              <div><label className="text-sm font-medium">Notes</label><textarea className="w-full border rounded-md p-2 text-sm min-h-[60px]" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} /></div>
+              <CustomFieldsRenderer entityType="license" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
+              <div className="flex gap-2 justify-end"><Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button><Button className="bg-orange-500 hover:bg-orange-600" onClick={handleSave} data-testid="save-license-btn">Save Changes</Button></div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div><label className="text-sm font-medium text-gray-500">Provider</label><p className="mt-1">{license.provider || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Seats</label><p className="mt-1">{license.seats_total}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Expiration</label><p className="mt-1">{license.expiration_date ? formatDate(license.expiration_date) : '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Renewal Cost</label><p className="mt-1">{license.renewal_cost ? `$${license.renewal_cost}` : '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Billing</label><p className="mt-1">{license.billing_cycle || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Company</label><p className="mt-1">{companies.find(c => c.id === license.client_company_id)?.name || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Created</label><p className="mt-1">{formatDateTime(license.created_at)}</p></div>
+                {license.days_until_expiration !== null && <div><label className="text-sm font-medium text-gray-500">Days Until Expiry</label><p className="mt-1">{license.days_until_expiration}</p></div>}
+              </div>
+              {license.license_key && <div><label className="text-sm font-medium text-gray-500">License Key</label><p className="mt-1 font-mono text-sm bg-gray-50 p-2 rounded">{license.license_key}</p></div>}
+              {license.notes && <div><label className="text-sm font-medium text-gray-500">Notes</label><p className="mt-1">{license.notes}</p></div>}
+              <CustomFieldsRenderer entityType="license" fieldsData={license.custom_fields_data || {}} onChange={() => {}} readOnly />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// ==================== COMPANY DETAIL PAGE ====================
+
+const CompanyDetailPage = () => {
+  const { id } = useParams();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const [company, setCompany] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [companyDevices, setCompanyDevices] = useState([]);
+  const [companyLicenses, setCompanyLicenses] = useState([]);
+  const [companyUsers, setCompanyUsers] = useState([]);
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchCompany(); }, [id]);
+
+  const fetchCompany = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/client-companies/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setCompany(res.data);
+      setFormData({ name: res.data.name, domain: res.data.domain || '', industry: res.data.industry || '', country: res.data.country || '', city: res.data.city || '', address: res.data.address || '', phone: res.data.phone || '', contact_email: res.data.contact_email || '', custom_fields_data: res.data.custom_fields_data || {} });
+      try { const d = await axios.get(`${API_URL}/client-companies/${id}/devices`, { headers: { Authorization: `Bearer ${token}` } }); setCompanyDevices(d.data || []); } catch (e) {}
+      try { const l = await axios.get(`${API_URL}/client-companies/${id}/licenses`, { headers: { Authorization: `Bearer ${token}` } }); setCompanyLicenses(l.data || []); } catch (e) {}
+      try { const u = await axios.get(`${API_URL}/end-users`, { headers: { Authorization: `Bearer ${token}` } }); setCompanyUsers((u.data || []).filter(eu => eu.client_company_id === id)); } catch (e) {}
+    } catch (e) { toast.error('Company not found'); navigate('/companies'); }
+    finally { setLoading(false); }
+  };
+
+  const handleSave = async () => {
+    try {
+      await axios.patch(`${API_URL}/client-companies/${id}`, formData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Company updated');
+      setEditing(false);
+      fetchCompany();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed to update'); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this company? This will fail if end users are linked.')) return;
+    try { await axios.delete(`${API_URL}/client-companies/${id}`, { headers: { Authorization: `Bearer ${token}` } }); toast.success('Deleted'); navigate('/companies'); } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
+  };
+
+  if (loading) return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>;
+  if (!company) return null;
+
+  return (
+    <div className="p-6 max-w-4xl" data-testid="company-detail-page">
+      <div className="flex items-center gap-2 mb-6"><Button variant="ghost" size="sm" onClick={() => navigate('/companies')} data-testid="back-to-companies-btn"><ArrowLeft size={16} className="mr-1" /> Companies</Button></div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center"><Building2 size={24} className="text-indigo-600" /></div>
+              <div><CardTitle className="text-xl">{company.name}</CardTitle>{company.domain && <p className="text-sm text-blue-500 mt-1">{company.domain}</p>}</div>
+            </div>
+            {canEdit && !editing && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="edit-company-btn"><Edit size={14} className="mr-1" /> Edit</Button>
+                <Button variant="outline" size="sm" className="text-red-600" onClick={handleDelete} data-testid="delete-company-btn"><Trash2 size={14} className="mr-1" /> Delete</Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {editing ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} data-testid="edit-company-name" /></div>
+                <div><label className="text-sm font-medium">Domain</label><Input value={formData.domain} onChange={e => setFormData({ ...formData, domain: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Industry</label><Input value={formData.industry} onChange={e => setFormData({ ...formData, industry: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Phone</label><Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Country</label><Input value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">City</label><Input value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Address</label><Input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Contact Email</label><Input type="email" value={formData.contact_email} onChange={e => setFormData({ ...formData, contact_email: e.target.value })} /></div>
+              </div>
+              <CustomFieldsRenderer entityType="company" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
+              <div className="flex gap-2 justify-end"><Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button><Button className="bg-orange-500 hover:bg-orange-600" onClick={handleSave} data-testid="save-company-btn">Save Changes</Button></div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div><label className="text-sm font-medium text-gray-500">Industry</label><p className="mt-1">{company.industry || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Phone</label><p className="mt-1">{company.phone || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Contact Email</label><p className="mt-1">{company.contact_email || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Country</label><p className="mt-1">{company.country || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">City</label><p className="mt-1">{company.city || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Address</label><p className="mt-1">{company.address || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Created</label><p className="mt-1">{formatDateTime(company.created_at)}</p></div>
+              </div>
+              <CustomFieldsRenderer entityType="company" fieldsData={company.custom_fields_data || {}} onChange={() => {}} readOnly />
+              {companyUsers.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">End Users ({companyUsers.length})</h4>
+                  <div className="space-y-2">{companyUsers.map(u => (
+                    <Link key={u.id} to={`/end-users/${u.id}`} className="block p-2 border rounded hover:bg-gray-50"><span className="font-medium">{u.name}</span> <span className="text-gray-500 text-sm">{u.email}</span></Link>
+                  ))}</div>
+                </div>
+              )}
+              {companyDevices.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Devices ({companyDevices.length})</h4>
+                  <div className="space-y-2">{companyDevices.map(d => (
+                    <Link key={d.id} to={`/devices/${d.id}`} className="block p-2 border rounded hover:bg-gray-50"><span className="font-medium">{d.name}</span> <span className="text-gray-500 text-sm">{d.device_type} • {d.status}</span></Link>
+                  ))}</div>
+                </div>
+              )}
+              {companyLicenses.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Licenses ({companyLicenses.length})</h4>
+                  <div className="space-y-2">{companyLicenses.map(l => (
+                    <Link key={l.id} to={`/licenses/${l.id}`} className="block p-2 border rounded hover:bg-gray-50"><span className="font-medium">{l.name}</span> <span className="text-gray-500 text-sm">{l.license_type} • {l.status}</span></Link>
+                  ))}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// ==================== END USER DETAIL PAGE ====================
+
+const EndUserDetailPage = () => {
+  const { id } = useParams();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const [endUser, setEndUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [companies, setCompanies] = useState([]);
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => { fetchEndUser(); fetchCompanies(); }, [id]);
+
+  const fetchEndUser = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/end-users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setEndUser(res.data);
+      setFormData({ name: res.data.name, email: res.data.email, phone: res.data.phone || '', client_company_id: res.data.client_company_id || '', status: res.data.status || 'active', custom_fields_data: res.data.custom_fields_data || {} });
+    } catch (e) { toast.error('End user not found'); navigate('/end-users'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchCompanies = async () => { try { const r = await axios.get(`${API_URL}/client-companies`, { headers: { Authorization: `Bearer ${token}` } }); setCompanies(r.data || []); } catch (e) {} };
+
+  const handleSave = async () => {
+    try {
+      await axios.patch(`${API_URL}/end-users/${id}`, formData, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('End user updated');
+      setEditing(false);
+      fetchEndUser();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed to update'); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this end user?')) return;
+    try { await axios.delete(`${API_URL}/end-users/${id}`, { headers: { Authorization: `Bearer ${token}` } }); toast.success('Deleted'); navigate('/end-users'); } catch (e) { toast.error('Failed'); }
+  };
+
+  if (loading) return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>;
+  if (!endUser) return null;
+
+  return (
+    <div className="p-6 max-w-4xl" data-testid="enduser-detail-page">
+      <div className="flex items-center gap-2 mb-6"><Button variant="ghost" size="sm" onClick={() => navigate('/end-users')} data-testid="back-to-endusers-btn"><ArrowLeft size={16} className="mr-1" /> End Users</Button></div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center"><span className="text-orange-600 text-lg font-semibold">{endUser.name?.charAt(0)?.toUpperCase()}</span></div>
+              <div><CardTitle className="text-xl">{endUser.name}</CardTitle><p className="text-sm text-gray-500 mt-1">{endUser.email}</p></div>
+            </div>
+            {canEdit && !editing && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="edit-enduser-btn"><Edit size={14} className="mr-1" /> Edit</Button>
+                <Button variant="outline" size="sm" className="text-red-600" onClick={handleDelete} data-testid="delete-enduser-btn"><Trash2 size={14} className="mr-1" /> Delete</Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {editing ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Name *</label><Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} data-testid="edit-enduser-name" /></div>
+                <div><label className="text-sm font-medium">Email *</label><Input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} data-testid="edit-enduser-email" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium">Phone</label><Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} /></div>
+                <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={e => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- None --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              </div>
+              <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+              <CustomFieldsRenderer entityType="end_user" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
+              <div className="flex gap-2 justify-end"><Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button><Button className="bg-orange-500 hover:bg-orange-600" onClick={handleSave} data-testid="save-enduser-btn">Save Changes</Button></div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-sm font-medium text-gray-500">Phone</label><p className="mt-1">{endUser.phone || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Company</label><p className="mt-1">{companies.find(c => c.id === endUser.client_company_id)?.name || '—'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Status</label><p className="mt-1">{endUser.status || 'active'}</p></div>
+                <div><label className="text-sm font-medium text-gray-500">Created</label><p className="mt-1">{formatDateTime(endUser.created_at)}</p></div>
+              </div>
+              <CustomFieldsRenderer entityType="end_user" fieldsData={endUser.custom_fields_data || {}} onChange={() => {}} readOnly />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 // ==================== PROTECTED ROUTE ====================
 
 const ProtectedRoute = ({ children }) => {
