@@ -460,8 +460,8 @@ const PricingPage = () => {
       <section className="pt-32 pb-16 px-4 relative">
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-gray-950" />
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h1 className="text-4xl font-bold text-white mb-4">Simple, Transparent Pricing</h1>
-          <p className="text-xl text-gray-400">Choose the plan that fits your needs. All plans include a 14-day free trial.</p>
+          <h1 className="text-4xl font-bold text-white mb-4">Simple, Per-Seat Pricing</h1>
+          <p className="text-xl text-gray-400">Pay only for what you need. Save 15% with yearly billing.</p>
         </div>
       </section>
 
@@ -482,9 +482,13 @@ const PricingPage = () => {
                   <CardHeader className="text-center pb-2">
                     <CardTitle className="text-2xl text-white">{plan.name}</CardTitle>
                     <div className="mt-4">
-                      <span className="text-4xl font-bold text-white">${plan.price}</span>
-                      <span className="text-gray-400">/month</span>
+                      <span className="text-4xl font-bold text-white">${plan.price_per_seat || plan.price}</span>
+                      <span className="text-gray-400">/user/month</span>
                     </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {plan.min_seats > 1 ? `Min ${plan.min_seats} users` : 'No minimum'}
+                      {plan.max_slas === null ? ' • Unlimited SLAs' : plan.max_slas ? ` • ${plan.max_slas} SLA${plan.max_slas > 1 ? 's' : ''}` : ''}
+                    </p>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-3 mb-6">
