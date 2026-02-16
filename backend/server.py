@@ -947,19 +947,33 @@ class Task(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     organization_id: str
     title: str
-    description: str
+    description: str = ""
+    priority: str = "medium"
     status: str = TaskStatus.TODO
     due_date: Optional[datetime] = None
     assigned_staff_id: Optional[str] = None
     ticket_id: Optional[str] = None
+    custom_fields_data: dict = {}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TaskCreate(BaseModel):
     title: str
-    description: str
+    description: str = ""
+    priority: str = "medium"
+    status: str = "pending"
     due_date: Optional[datetime] = None
     assigned_staff_id: Optional[str] = None
     ticket_id: Optional[str] = None
+    custom_fields_data: dict = {}
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    due_date: Optional[datetime] = None
+    assigned_staff_id: Optional[str] = None
+    custom_fields_data: Optional[dict] = None
 
 # ==================== CUSTOM FIELDS MODELS ====================
 
