@@ -361,9 +361,9 @@ async def can_use_feature(org_id: str, feature_name: str) -> bool:
         return False
 
 async def check_staff_limit(org_id: str) -> bool:
-    """Check if organization can add more staff users - ALWAYS TRUE (unlimited)"""
-    # Staff users are unlimited on all plans
-    return True
+    """Check if organization can add more staff users based on seat_count"""
+    seat_info = await check_seat_availability(org_id)
+    return seat_info["can_add_user"]
 
 async def get_resource_limit(org_id: str, resource: str) -> Optional[int]:
     """Get the limit for a specific resource (None = unlimited)"""
