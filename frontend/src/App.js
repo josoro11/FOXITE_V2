@@ -3167,6 +3167,7 @@ const LicensesPage = () => {
                 <div><label className="text-sm font-medium">Expiration</label><Input type="date" value={formData.expiration_date} onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })} /></div>
                 <div><label className="text-sm font-medium">Company</label><select className="w-full border rounded-md p-2" value={formData.client_company_id} onChange={(e) => setFormData({ ...formData, client_company_id: e.target.value })}><option value="">-- Select --</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
               </div>
+              <CustomFieldsRenderer entityType="license" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
               <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-license-btn">Create</Button></div>
             </form>
           </CardContent>
