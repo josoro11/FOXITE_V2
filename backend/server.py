@@ -935,6 +935,75 @@ class TaskCreate(BaseModel):
     assigned_staff_id: Optional[str] = None
     ticket_id: Optional[str] = None
 
+# ==================== CUSTOM FIELDS MODELS ====================
+
+class FieldType(str):
+    TEXT = "text"
+    NUMBER = "number"
+    DATE = "date"
+    BOOLEAN = "boolean"
+    DROPDOWN = "dropdown"
+    FILE = "file"
+
+class EntityType(str):
+    TICKET = "ticket"
+    DEVICE = "device"
+    COMPANY = "company"
+    END_USER = "end_user"
+    LICENSE = "license"
+    TASK = "task"
+
+class CustomField(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    entity_type: str  # ticket, device, company, end_user, license, task
+    label: str
+    field_type: str  # text, number, date, boolean, dropdown, file
+    required: bool = False
+    options: List[str] = []  # For dropdown type
+    active: bool = True
+    order: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CustomFieldCreate(BaseModel):
+    entity_type: str
+    label: str
+    field_type: str
+    required: bool = False
+    options: List[str] = []
+    order: int = 0
+
+class CustomFieldUpdate(BaseModel):
+    label: Optional[str] = None
+    required: Optional[bool] = None
+    options: Optional[List[str]] = None
+    active: Optional[bool] = None
+    order: Optional[int] = None
+
+# ==================== ATTACHMENTS MODELS ====================
+
+class Attachment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    entity_type: str  # ticket, device, company, end_user, license
+    entity_id: str
+    file_name: str
+    file_url: str
+    file_size: int = 0
+    mime_type: str = "application/octet-stream"
+    uploaded_by: str  # user_id
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AttachmentCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    file_name: str
+    file_url: str
+    file_size: int = 0
+    mime_type: str = "application/octet-stream"
+
 # Notification Models
 class Notification(BaseModel):
     model_config = ConfigDict(extra="ignore")
