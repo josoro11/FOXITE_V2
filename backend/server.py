@@ -2194,6 +2194,9 @@ async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(
     if not org_id:
         raise HTTPException(status_code=403, detail="SaaS Owners cannot create tickets directly")
     
+    # Check if org is suspended
+    await enforce_not_suspended(org_id)
+    
     # Get next ticket number for this organization
     ticket_number = await get_next_ticket_number(org_id)
     
