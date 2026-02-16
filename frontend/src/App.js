@@ -1807,17 +1807,43 @@ const TicketDetailPage = () => {
   const [ticket, setTicket] = useState(null);
   const [comments, setComments] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [allDevices, setAllDevices] = useState([]);
+  const [activityLog, setActivityLog] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('conversation');
+  
+  // Comment form
   const [newComment, setNewComment] = useState('');
   const [commentType, setCommentType] = useState('public_reply');
-  const [loading, setLoading] = useState(true);
+  
+  // Time tracking
   const [activeSession, setActiveSession] = useState(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualDuration, setManualDuration] = useState('');
   const [manualNote, setManualNote] = useState('');
+  
+  // Task form
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  
+  // Device linking
+  const [showDeviceLink, setShowDeviceLink] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
 
   const canManageTime = user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'technician';
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
 
-  useEffect(() => { fetchTicket(); fetchComments(); fetchSessions(); }, [id]);
+  useEffect(() => { 
+    fetchTicket(); 
+    fetchComments(); 
+    fetchSessions(); 
+    fetchTasks();
+    fetchDevices();
+    fetchAllDevices();
+    fetchActivityLog();
+  }, [id]);
 
   const fetchTicket = async () => {
     try {
@@ -1830,7 +1856,7 @@ const TicketDetailPage = () => {
   const fetchComments = async () => {
     try {
       const res = await axios.get(`${API_URL}/tickets/${id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
-      setComments(res.data);
+      setComments(res.data || []);
     } catch (e) {}
   };
 
@@ -1843,21 +1869,56 @@ const TicketDetailPage = () => {
     } catch (e) {}
   };
 
-  const updateStatus = async (status) => {
+  const fetchTasks = async () => {
     try {
-      await axios.patch(`${API_URL}/tickets/${id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success('Status updated');
+      const res = await axios.get(`${API_URL}/tasks?ticket_id=${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setTasks(res.data || []);
+    } catch (e) {}
+  };
+
+  const fetchDevices = async () => {
+    if (!ticket?.device_id) return;
+    try {
+      const res = await axios.get(`${API_URL}/devices/${ticket.device_id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setDevices(res.data ? [res.data] : []);
+    } catch (e) {}
+  };
+
+  const fetchAllDevices = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/devices`, { headers: { Authorization: `Bearer ${token}` } });
+      setAllDevices(res.data || []);
+    } catch (e) {}
+  };
+
+  const fetchActivityLog = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/audit-logs?entity_type=ticket&entity_id=${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setActivityLog(res.data || []);
+    } catch (e) {}
+  };
+
+  const updateTicket = async (updates) => {
+    try {
+      await axios.patch(`${API_URL}/tickets/${id}`, updates, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Ticket updated');
       fetchTicket();
-    } catch (e) { toast.error('Failed'); }
+      fetchActivityLog();
+      // Auto-stop timer when ticket is closed
+      if (updates.status === 'closed' && activeSession) {
+        await stopTimer();
+      }
+    } catch (e) { toast.error('Failed to update'); }
   };
 
   const addComment = async () => {
     if (!newComment.trim()) return;
     try {
       await axios.post(`${API_URL}/tickets/${id}/comments`, { comment_type: commentType, content: newComment }, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success('Added');
+      toast.success('Comment added');
       setNewComment('');
       fetchComments();
+      fetchActivityLog();
     } catch (e) { toast.error('Failed'); }
   };
 
@@ -1866,7 +1927,7 @@ const TicketDetailPage = () => {
       await axios.post(`${API_URL}/sessions/start`, { ticket_id: id }, { headers: { Authorization: `Bearer ${token}` } });
       toast.success('Timer started');
       fetchSessions();
-    } catch (e) { toast.error(e.response?.data?.detail || 'Failed to start timer'); }
+    } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
   };
 
   const stopTimer = async () => {
@@ -1875,7 +1936,7 @@ const TicketDetailPage = () => {
       await axios.post(`${API_URL}/sessions/stop`, { session_id: activeSession.id }, { headers: { Authorization: `Bearer ${token}` } });
       toast.success('Timer stopped');
       fetchSessions();
-    } catch (e) { toast.error('Failed to stop timer'); }
+    } catch (e) { toast.error('Failed'); }
   };
 
   const addManualEntry = async () => {
@@ -1891,120 +1952,449 @@ const TicketDetailPage = () => {
     } catch (e) { toast.error('Failed'); }
   };
 
+  const createTask = async () => {
+    if (!taskTitle.trim()) { toast.error('Enter task title'); return; }
+    try {
+      await axios.post(`${API_URL}/tasks`, { title: taskTitle, ticket_id: id, priority: 'medium', status: 'pending' }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Task created');
+      setShowTaskForm(false);
+      setTaskTitle('');
+      fetchTasks();
+    } catch (e) { toast.error('Failed'); }
+  };
+
+  const linkDevice = async () => {
+    if (!selectedDeviceId) { toast.error('Select a device'); return; }
+    try {
+      await axios.patch(`${API_URL}/tickets/${id}`, { device_id: selectedDeviceId }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Device linked');
+      setShowDeviceLink(false);
+      setSelectedDeviceId('');
+      fetchTicket();
+      fetchDevices();
+    } catch (e) { toast.error('Failed'); }
+  };
+
   const totalTime = sessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
 
-  if (loading || !ticket) return <div className="p-6">Loading...</div>;
+  if (loading || !ticket) return <div className="p-6 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div></div>;
 
   const statuses = ['new', 'open', 'in_progress', 'on_hold', 'resolved', 'closed'];
+  const priorities = ['low', 'medium', 'high', 'urgent'];
+  const priorityColors = { low: 'bg-gray-100 text-gray-700', medium: 'bg-blue-100 text-blue-700', high: 'bg-orange-100 text-orange-700', urgent: 'bg-red-100 text-red-700' };
+  const statusColors = { new: 'bg-purple-100 text-purple-700', open: 'bg-blue-100 text-blue-700', in_progress: 'bg-yellow-100 text-yellow-700', on_hold: 'bg-gray-100 text-gray-700', resolved: 'bg-green-100 text-green-700', closed: 'bg-gray-200 text-gray-600' };
+
+  const tabs = [
+    { id: 'conversation', label: 'Conversation', icon: MessageSquare },
+    { id: 'activity', label: 'Activity', icon: Clock },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
+    { id: 'devices', label: 'Devices', icon: Monitor, count: devices.length },
+    { id: 'time', label: 'Time Tracking', icon: PlayCircle },
+  ];
 
   return (
-    <div className="p-6 max-w-4xl" data-testid="ticket-detail-page">
-      <button onClick={() => navigate('/tickets')} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 mb-4 text-sm"><ArrowLeft size={16} /> Back</button>
-      <Card className="mb-4">
-        <CardHeader>
-          <CardDescription>#{ticket.ticket_number}</CardDescription>
-          <CardTitle>{ticket.title}</CardTitle>
-        </CardHeader>
-        <CardContent><p className="text-gray-700">{ticket.description}</p></CardContent>
-      </Card>
-      <Card className="mb-4">
-        <CardHeader><CardTitle className="text-base">Status</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {statuses.map((s) => (
-              <Button key={s} variant={ticket.status === s ? 'default' : 'outline'} size="sm" onClick={() => updateStatus(s)} className={ticket.status === s ? 'bg-orange-500' : ''}>
-                {s.replace('_', ' ')}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Time Tracking Section */}
-      {canManageTime && (
-        <Card className="mb-4" data-testid="time-tracking-section">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2"><Clock size={18} /> Time Tracking</CardTitle>
-              <Badge variant="outline">{Math.floor(totalTime / 60)}h {totalTime % 60}m total</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 mb-4">
-              {activeSession ? (
-                <Button onClick={stopTimer} variant="destructive" size="sm" data-testid="stop-timer-btn">
-                  <StopCircle size={16} className="mr-1" /> Stop Timer
-                </Button>
-              ) : (
-                <Button onClick={startTimer} className="bg-green-600 hover:bg-green-700" size="sm" data-testid="start-timer-btn">
-                  <PlayCircle size={16} className="mr-1" /> Start Timer
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={() => setShowManualEntry(!showManualEntry)} data-testid="manual-entry-btn">
-                <Plus size={16} className="mr-1" /> Manual Entry
-              </Button>
-            </div>
-            {showManualEntry && (
-              <div className="bg-gray-50 p-3 rounded-lg mb-4 flex gap-2 items-end">
-                <div className="flex-1">
-                  <label className="text-xs font-medium text-gray-600">Duration (minutes)</label>
-                  <Input type="number" value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder="30" className="h-8" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs font-medium text-gray-600">Notes (optional)</label>
-                  <Input value={manualNote} onChange={(e) => setManualNote(e.target.value)} placeholder="Work done..." className="h-8" />
-                </div>
-                <Button size="sm" onClick={addManualEntry} className="bg-orange-500 hover:bg-orange-600">Add</Button>
-              </div>
-            )}
-            {sessions.length > 0 ? (
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {sessions.map((s) => (
-                  <div key={s.id} className={`flex items-center justify-between p-2 rounded text-sm ${!s.end_time ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
-                    <div className="flex items-center gap-2">
-                      {!s.end_time && <span className="animate-pulse w-2 h-2 bg-green-500 rounded-full"></span>}
-                      <span className="text-gray-600">{formatDateTime(s.start_time)}</span>
-                      {s.notes && <span className="text-gray-500">- {s.notes}</span>}
-                    </div>
-                    <Badge variant={!s.end_time ? 'default' : 'secondary'} className={!s.end_time ? 'bg-green-600' : ''}>
-                      {!s.end_time ? 'Running...' : `${s.duration_minutes} min`}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">No time entries yet</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+    <div className="p-6" data-testid="ticket-detail-page">
+      {/* Back Button */}
+      <button onClick={() => navigate('/tickets')} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 mb-4 text-sm">
+        <ArrowLeft size={16} /> Back to Tickets
+      </button>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Activity</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
-            {comments.map((c) => (
-              <div key={c.id} className={`p-3 rounded-lg ${c.comment_type === 'internal_note' ? 'bg-amber-50 border-l-4 border-amber-400' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-sm">{c.author_name}</span>
-                  {c.comment_type === 'internal_note' && <Badge variant="outline" className="text-xs"><Lock size={10} className="mr-1" />Internal</Badge>}
-                </div>
-                <p className="text-sm">{c.content}</p>
+      {/* Ticket Header */}
+      <div className="bg-white rounded-xl border shadow-sm mb-6">
+        <div className="p-6 border-b">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-gray-500 font-mono text-sm">#{ticket.ticket_number}</span>
+                <Badge className={statusColors[ticket.status]}>{ticket.status?.replace('_', ' ')}</Badge>
+                <Badge className={priorityColors[ticket.priority]}>{ticket.priority}</Badge>
+                {ticket.sla_breached && <Badge className="bg-red-500 text-white">SLA Breached</Badge>}
               </div>
-            ))}
-          </div>
-          <div className="border-t pt-4">
-            <div className="flex gap-2 mb-2">
-              <button onClick={() => setCommentType('public_reply')} className={`px-3 py-1 rounded text-sm ${commentType === 'public_reply' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}><MessageSquare size={14} className="inline mr-1" />Public</button>
-              <button onClick={() => setCommentType('internal_note')} className={`px-3 py-1 rounded text-sm ${commentType === 'internal_note' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100'}`}><Lock size={14} className="inline mr-1" />Internal</button>
+              <h1 className="text-xl font-bold text-gray-900 mb-2">{ticket.title}</h1>
+              <p className="text-gray-600">{ticket.description}</p>
             </div>
-            <div className="flex gap-2">
-              <textarea className="flex-1 border rounded-lg p-2 text-sm" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add comment..." />
-              <Button onClick={addComment} className="bg-orange-500 hover:bg-orange-600"><Send size={16} /></Button>
-            </div>
+            {activeSession && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 flex items-center gap-2">
+                <span className="animate-pulse w-2 h-2 bg-green-500 rounded-full"></span>
+                <span className="text-green-700 text-sm font-medium">Timer Running</span>
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        
+        {/* Ticket Metadata */}
+        <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 text-sm">
+          <div>
+            <span className="text-gray-500 block">Status</span>
+            <select 
+              value={ticket.status} 
+              onChange={(e) => updateTicket({ status: e.target.value })}
+              className="mt-1 border rounded px-2 py-1 text-sm w-full"
+              data-testid="status-select"
+            >
+              {statuses.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+          </div>
+          <div>
+            <span className="text-gray-500 block">Priority</span>
+            <select 
+              value={ticket.priority} 
+              onChange={(e) => updateTicket({ priority: e.target.value })}
+              className="mt-1 border rounded px-2 py-1 text-sm w-full"
+              data-testid="priority-select"
+            >
+              {priorities.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <span className="text-gray-500 block">Assigned To</span>
+            <p className="font-medium mt-1">{ticket.assigned_staff_name || 'Unassigned'}</p>
+          </div>
+          <div>
+            <span className="text-gray-500 block">Requester</span>
+            <p className="font-medium mt-1">{ticket.requester_name || 'Unknown'}</p>
+          </div>
+          <div>
+            <span className="text-gray-500 block">Source</span>
+            <p className="font-medium mt-1 capitalize">{ticket.source || 'Portal'}</p>
+          </div>
+          <div>
+            <span className="text-gray-500 block">Created</span>
+            <p className="font-medium mt-1">{formatDateTime(ticket.created_at)}</p>
+          </div>
+        </div>
+
+        {/* SLA Info */}
+        {(ticket.response_due_at || ticket.resolution_due_at) && (
+          <div className="px-6 py-3 bg-gray-50 border-t flex gap-6 text-sm">
+            {ticket.response_due_at && (
+              <div className="flex items-center gap-2">
+                <Shield size={14} className="text-gray-500" />
+                <span className="text-gray-600">Response Due:</span>
+                <span className={`font-medium ${ticket.sla_response_breached ? 'text-red-600' : 'text-gray-900'}`}>
+                  {formatDateTime(ticket.response_due_at)}
+                </span>
+              </div>
+            )}
+            {ticket.resolution_due_at && (
+              <div className="flex items-center gap-2">
+                <Shield size={14} className="text-gray-500" />
+                <span className="text-gray-600">Resolution Due:</span>
+                <span className={`font-medium ${ticket.sla_resolution_breached ? 'text-red-600' : 'text-gray-900'}`}>
+                  {formatDateTime(ticket.resolution_due_at)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white rounded-xl border shadow-sm">
+        <div className="border-b">
+          <div className="flex gap-1 p-1">
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === tab.id 
+                      ? 'bg-orange-50 text-orange-600' 
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                  data-testid={`tab-${tab.id}`}
+                >
+                  <Icon size={16} />
+                  {tab.label}
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs">{tab.count}</Badge>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="p-6">
+          {/* Conversation Tab */}
+          {activeTab === 'conversation' && (
+            <div data-testid="conversation-tab">
+              {/* Comment Input */}
+              <div className="mb-6 bg-gray-50 rounded-lg p-4">
+                <div className="flex gap-2 mb-3">
+                  <button 
+                    onClick={() => setCommentType('public_reply')} 
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${commentType === 'public_reply' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    <MessageSquare size={14} className="inline mr-2" />Public Reply
+                  </button>
+                  <button 
+                    onClick={() => setCommentType('internal_note')} 
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${commentType === 'internal_note' ? 'bg-amber-100 text-amber-700' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    <Lock size={14} className="inline mr-2" />Internal Note
+                  </button>
+                </div>
+                <textarea 
+                  className="w-full border rounded-lg p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-orange-500 focus:border-orange-500" 
+                  value={newComment} 
+                  onChange={(e) => setNewComment(e.target.value)} 
+                  placeholder={commentType === 'internal_note' ? 'Add an internal note (not visible to requester)...' : 'Write a public reply...'}
+                />
+                <div className="flex justify-end mt-3">
+                  <Button onClick={addComment} className="bg-orange-500 hover:bg-orange-600" data-testid="send-comment-btn">
+                    <Send size={16} className="mr-2" />
+                    {commentType === 'internal_note' ? 'Add Note' : 'Send Reply'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Comments List */}
+              <div className="space-y-4">
+                {comments.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No comments yet</p>
+                ) : (
+                  comments.map((c) => (
+                    <div key={c.id} className={`rounded-lg p-4 ${c.comment_type === 'internal_note' ? 'bg-amber-50 border-l-4 border-amber-400' : 'bg-white border'}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium">{c.author_name?.charAt(0)?.toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-sm">{c.author_name}</span>
+                          <span className="text-gray-500 text-xs ml-2">{formatDateTime(c.created_at)}</span>
+                        </div>
+                        {c.comment_type === 'internal_note' && (
+                          <Badge variant="outline" className="text-xs ml-auto"><Lock size={10} className="mr-1" />Internal</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Activity Tab */}
+          {activeTab === 'activity' && (
+            <div data-testid="activity-tab">
+              <h3 className="font-semibold mb-4">Activity Timeline</h3>
+              <div className="space-y-4">
+                {activityLog.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No activity recorded</p>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200"></div>
+                    {activityLog.map((log, i) => (
+                      <div key={log.id || i} className="relative pl-10 pb-6">
+                        <div className="absolute left-2.5 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-sm">
+                            <span className="font-medium">{log.action}</span>
+                            {log.changes && <span className="text-gray-600"> - {JSON.stringify(log.changes)}</span>}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">{formatDateTime(log.timestamp || log.created_at)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Also show time entries in activity */}
+                {sessions.length > 0 && (
+                  <>
+                    <h4 className="font-medium text-gray-700 mt-6 mb-3">Time Entries</h4>
+                    {sessions.map(s => (
+                      <div key={s.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg text-sm">
+                        <div className="flex items-center gap-2">
+                          <Clock size={14} className="text-blue-600" />
+                          <span>{formatDateTime(s.start_time)}</span>
+                          {s.notes && <span className="text-gray-500">- {s.notes}</span>}
+                        </div>
+                        <Badge variant="secondary">{s.duration_minutes || 0} min</Badge>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tasks Tab */}
+          {activeTab === 'tasks' && (
+            <div data-testid="tasks-tab">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Linked Tasks</h3>
+                {canEdit && (
+                  <Button size="sm" onClick={() => setShowTaskForm(true)} className="bg-orange-500 hover:bg-orange-600">
+                    <Plus size={16} className="mr-1" /> Add Task
+                  </Button>
+                )}
+              </div>
+              
+              {showTaskForm && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <Input 
+                    value={taskTitle} 
+                    onChange={(e) => setTaskTitle(e.target.value)} 
+                    placeholder="Task title..."
+                    className="mb-2"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={createTask} className="bg-orange-500 hover:bg-orange-600">Create</Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowTaskForm(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+
+              {tasks.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No tasks linked to this ticket</p>
+              ) : (
+                <div className="space-y-3">
+                  {tasks.map(task => (
+                    <div key={task.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <CheckSquare size={18} className={task.status === 'completed' ? 'text-green-600' : 'text-gray-400'} />
+                        <div>
+                          <p className={`font-medium ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>{task.title}</p>
+                          {task.assigned_to && <p className="text-xs text-gray-500">Assigned to: {task.assigned_to}</p>}
+                        </div>
+                      </div>
+                      <Badge className={task.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
+                        {task.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Devices Tab */}
+          {activeTab === 'devices' && (
+            <div data-testid="devices-tab">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Linked Devices</h3>
+                {canEdit && (
+                  <Button size="sm" onClick={() => setShowDeviceLink(true)} className="bg-orange-500 hover:bg-orange-600">
+                    <Plus size={16} className="mr-1" /> Link Device
+                  </Button>
+                )}
+              </div>
+
+              {showDeviceLink && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <select 
+                    value={selectedDeviceId} 
+                    onChange={(e) => setSelectedDeviceId(e.target.value)}
+                    className="w-full border rounded-lg p-2 mb-2"
+                  >
+                    <option value="">Select a device...</option>
+                    {allDevices.map(d => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.device_type})</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={linkDevice} className="bg-orange-500 hover:bg-orange-600">Link</Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowDeviceLink(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+
+              {ticket.device_id ? (
+                <div className="space-y-3">
+                  {devices.map(device => (
+                    <div key={device.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Monitor size={24} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{device.name}</p>
+                        <p className="text-sm text-gray-500">{device.device_type} • {device.serial_number || 'No S/N'}</p>
+                      </div>
+                      <Badge className={device.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
+                        {device.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">No devices linked to this ticket</p>
+              )}
+            </div>
+          )}
+
+          {/* Time Tracking Tab */}
+          {activeTab === 'time' && canManageTime && (
+            <div data-testid="time-tracking-tab">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-semibold">Time Tracking</h3>
+                <Badge variant="outline" className="text-lg px-4 py-2">
+                  <Clock size={18} className="mr-2" />
+                  {Math.floor(totalTime / 60)}h {totalTime % 60}m total
+                </Badge>
+              </div>
+
+              {/* Timer Controls */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="flex gap-3 mb-4">
+                  {activeSession ? (
+                    <Button onClick={stopTimer} variant="destructive" data-testid="stop-timer-btn">
+                      <StopCircle size={18} className="mr-2" /> Stop Timer
+                    </Button>
+                  ) : (
+                    <Button onClick={startTimer} className="bg-green-600 hover:bg-green-700" data-testid="start-timer-btn">
+                      <PlayCircle size={18} className="mr-2" /> Start Timer
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setShowManualEntry(!showManualEntry)}>
+                    <Plus size={18} className="mr-2" /> Manual Entry
+                  </Button>
+                </div>
+
+                {showManualEntry && (
+                  <div className="flex gap-3 items-end mt-4 pt-4 border-t">
+                    <div className="flex-1">
+                      <label className="text-sm font-medium text-gray-600 mb-1 block">Duration (minutes)</label>
+                      <Input type="number" value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder="30" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-sm font-medium text-gray-600 mb-1 block">Notes</label>
+                      <Input value={manualNote} onChange={(e) => setManualNote(e.target.value)} placeholder="Work performed..." />
+                    </div>
+                    <Button onClick={addManualEntry} className="bg-orange-500 hover:bg-orange-600">Add Entry</Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Time Entries List */}
+              <h4 className="font-medium mb-3">Time Entries</h4>
+              {sessions.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No time entries yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {sessions.map((s) => (
+                    <div key={s.id} className={`flex items-center justify-between p-4 rounded-lg ${!s.end_time ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                      <div className="flex items-center gap-3">
+                        {!s.end_time && <span className="animate-pulse w-3 h-3 bg-green-500 rounded-full"></span>}
+                        <div>
+                          <p className="font-medium text-sm">{formatDateTime(s.start_time)}</p>
+                          {s.notes && <p className="text-gray-500 text-sm">{s.notes}</p>}
+                        </div>
+                      </div>
+                      <Badge variant={!s.end_time ? 'default' : 'secondary'} className={!s.end_time ? 'bg-green-600' : ''}>
+                        {!s.end_time ? 'Running...' : `${s.duration_minutes} min`}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
