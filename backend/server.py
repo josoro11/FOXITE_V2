@@ -2728,9 +2728,22 @@ async def create_sla_policy(policy_data: SLAPolicyCreate, current_user: dict = D
     if not org_id:
         raise HTTPException(status_code=403, detail="SaaS Owners cannot create SLA policies directly")
     
+    # Check if suspended
+    await enforce_not_suspended(org_id)
+    
     # Check if admin
     if current_user.get('role') not in ['admin']:
         raise HTTPException(status_code=403, detail="Only admins can manage SLA policies")
+    
+    # Check SLA limit based on plan
+    sla_info = await check_sla_limit(org_id)
+    if not sla_info["can_add_sla"]:
+        org = await db.organizations.find_one({"id": org_id}, {"_id": 0})
+        plan_id = org.get("plan", "CORE")
+        raise HTTPException(
+            status_code=403, 
+            detail=f"SLA limit reached ({sla_info['current_slas']}/{sla_info['max_slas']}). Upgrade from {plan_id} plan for more SLAs."
+        )
     
     # Check if policy for this priority already exists
     existing = await db.sla_policies.find_one({
