@@ -2721,6 +2721,7 @@ const TicketDetailPage = () => {
 
 const TasksPage = () => {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
