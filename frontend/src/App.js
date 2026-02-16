@@ -2780,7 +2780,7 @@ const TasksPage = () => {
     <div className="p-6" data-testid="tasks-page">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Tasks</h1>
-        {canEdit && <Button onClick={() => { setShowCreate(true); setEditingTask(null); setFormData({ title: '', description: '', priority: 'medium', status: 'pending' }); }} className="bg-orange-500 hover:bg-orange-600" data-testid="create-task-btn"><Plus size={16} className="mr-1" /> New Task</Button>}
+        {canEdit && <Button onClick={() => { setShowCreate(true); setEditingTask(null); setFormData({ title: '', description: '', priority: 'medium', status: 'pending', custom_fields_data: {} }); }} className="bg-orange-500 hover:bg-orange-600" data-testid="create-task-btn"><Plus size={16} className="mr-1" /> New Task</Button>}
       </div>
 
       {showCreate && canEdit && (
