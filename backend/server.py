@@ -2368,6 +2368,51 @@ async def list_end_users(current_user: dict = Depends(get_current_user)):
     
     return users
 
+@api_router.get("/end-users/{user_id}", response_model=EndUser)
+async def get_end_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners must specify organization")
+    eu = await db.end_users.find_one({"id": user_id, "organization_id": org_id}, {"_id": 0})
+    if not eu:
+        raise HTTPException(status_code=404, detail="End user not found")
+    if isinstance(eu.get('created_at'), str):
+        eu['created_at'] = datetime.fromisoformat(eu['created_at'])
+    return eu
+
+@api_router.patch("/end-users/{user_id}", response_model=EndUser)
+async def update_end_user(user_id: str, update_data: EndUserUpdate, current_user: dict = Depends(get_current_user)):
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot update end users directly")
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only Admin/Supervisor can update end users")
+    eu = await db.end_users.find_one({"id": user_id, "organization_id": org_id}, {"_id": 0})
+    if not eu:
+        raise HTTPException(status_code=404, detail="End user not found")
+    update_dict = {k: v for k, v in update_data.model_dump(exclude_unset=True).items()}
+    if update_dict:
+        await db.end_users.update_one({"id": user_id}, {"$set": update_dict})
+    await log_audit(org_id, current_user['id'], "UPDATE", "end_user", user_id)
+    updated = await db.end_users.find_one({"id": user_id}, {"_id": 0})
+    if isinstance(updated.get('created_at'), str):
+        updated['created_at'] = datetime.fromisoformat(updated['created_at'])
+    return updated
+
+@api_router.delete("/end-users/{user_id}")
+async def delete_end_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="SaaS Owners cannot delete end users directly")
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only Admin/Supervisor can delete end users")
+    eu = await db.end_users.find_one({"id": user_id, "organization_id": org_id}, {"_id": 0})
+    if not eu:
+        raise HTTPException(status_code=404, detail="End user not found")
+    await db.end_users.delete_one({"id": user_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "end_user", user_id)
+    return {"message": "End user deleted"}
+
 # ==================== TICKET ROUTES ====================
 
 @api_router.post("/tickets")
