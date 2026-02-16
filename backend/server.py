@@ -618,13 +618,17 @@ class EndUser(BaseModel):
     client_company_id: str
     name: str
     email: EmailStr
+    phone: Optional[str] = None
     status: str = "active"
+    custom_fields_data: dict = {}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class EndUserCreate(BaseModel):
-    client_company_id: str
+    client_company_id: Optional[str] = None
     name: str
     email: EmailStr
+    phone: Optional[str] = None
+    custom_fields_data: dict = {}
 
 # Client Company Models
 class ClientCompany(BaseModel):
@@ -632,17 +636,27 @@ class ClientCompany(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     organization_id: str
     name: str
-    country: str
-    city: str
-    contact_email: EmailStr
+    domain: Optional[str] = None
+    industry: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
     status: str = "active"
+    custom_fields_data: dict = {}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ClientCompanyCreate(BaseModel):
     name: str
-    country: str
-    city: str
-    contact_email: EmailStr
+    domain: Optional[str] = None
+    industry: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    custom_fields_data: dict = {}
 
 # Ticket Models
 class Ticket(BaseModel):
