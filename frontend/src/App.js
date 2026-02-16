@@ -2794,6 +2794,7 @@ const TasksPage = () => {
                 <div><label className="text-sm font-medium">Priority</label><select className="w-full border rounded-md p-2" value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
                 <div><label className="text-sm font-medium">Status</label><select className="w-full border rounded-md p-2" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
               </div>
+              <CustomFieldsRenderer entityType="task" fieldsData={formData.custom_fields_data} onChange={cfd => setFormData({ ...formData, custom_fields_data: cfd })} />
               <div className="flex gap-2 justify-end"><Button type="button" variant="outline" onClick={() => { setShowCreate(false); setEditingTask(null); }}>Cancel</Button><Button type="submit" className="bg-orange-500 hover:bg-orange-600" data-testid="submit-task-btn">{editingTask ? 'Update' : 'Create'}</Button></div>
             </form>
           </CardContent>
