@@ -3100,7 +3100,7 @@ const LicensesPage = () => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [formData, setFormData] = useState({ name: '', license_type: 'perpetual', status: 'active', seats_total: 1, expiration_date: '', client_company_id: '' });
+  const [formData, setFormData] = useState({ name: '', license_type: 'perpetual', status: 'active', seats_total: 1, expiration_date: '', client_company_id: '', custom_fields_data: {} });
 
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
 
