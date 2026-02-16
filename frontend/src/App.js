@@ -3092,6 +3092,7 @@ const DevicesPage = () => {
 
 const LicensesPage = () => {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [licenses, setLicenses] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
