@@ -3130,7 +3130,7 @@ const LicensesPage = () => {
       await axios.post(`${API_URL}/licenses`, submitData, { headers: { Authorization: `Bearer ${token}` } });
       toast.success('License created');
       setShowCreate(false);
-      setFormData({ name: '', license_type: 'perpetual', status: 'active', seats_total: 1, expiration_date: '', client_company_id: '' });
+      setFormData({ name: '', license_type: 'perpetual', status: 'active', seats_total: 1, expiration_date: '', client_company_id: '', custom_fields_data: {} });
       fetchLicenses();
     } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
   };
