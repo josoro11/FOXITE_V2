@@ -1023,6 +1023,7 @@ const SettingsPage = () => {
             <Route path="/" element={<OrganizationSettings />} />
             <Route path="/organization" element={<OrganizationSettings />} />
             <Route path="/billing" element={<BillingSettings />} />
+            <Route path="/custom-fields" element={<CustomFieldsSettings />} />
             <Route path="/business-hours" element={<BusinessHoursSettings />} />
             <Route path="/sla" element={<SLASettings />} />
             <Route path="/notifications" element={<NotificationSettings />} />
