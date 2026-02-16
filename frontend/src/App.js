@@ -2982,6 +2982,7 @@ const EndUsersPage = () => {
 
 const DevicesPage = () => {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
