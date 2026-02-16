@@ -1206,6 +1206,321 @@ const BillingSettings = () => {
   );
 };
 
+// ==================== CUSTOM FIELDS SETTINGS ====================
+
+const CustomFieldsSettings = () => {
+  const { token, user } = useAuth();
+  const [fields, setFields] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editingField, setEditingField] = useState(null);
+  const [selectedEntityType, setSelectedEntityType] = useState('ticket');
+  const [formData, setFormData] = useState({
+    entity_type: 'ticket',
+    label: '',
+    field_type: 'text',
+    required: false,
+    options: [],
+    order: 0
+  });
+  const [optionsInput, setOptionsInput] = useState('');
+
+  const entityTypes = [
+    { id: 'ticket', label: 'Tickets', icon: Ticket },
+    { id: 'device', label: 'Devices', icon: Monitor },
+    { id: 'company', label: 'Companies', icon: Building2 },
+    { id: 'end_user', label: 'End Users', icon: Users },
+    { id: 'license', label: 'Licenses', icon: Key },
+    { id: 'task', label: 'Tasks', icon: CheckSquare },
+  ];
+
+  const fieldTypes = [
+    { id: 'text', label: 'Text', icon: Type },
+    { id: 'number', label: 'Number', icon: Hash },
+    { id: 'date', label: 'Date', icon: Calendar },
+    { id: 'boolean', label: 'Yes/No', icon: ToggleLeft },
+    { id: 'dropdown', label: 'Dropdown', icon: ChevronDown },
+    { id: 'file', label: 'File Upload', icon: Upload },
+  ];
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'supervisor';
+
+  useEffect(() => {
+    fetchFields();
+  }, [selectedEntityType]);
+
+  const fetchFields = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/custom-fields?entity_type=${selectedEntityType}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setFields(res.data || []);
+    } catch (error) {
+      toast.error('Failed to load custom fields');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.label.trim()) { toast.error('Label is required'); return; }
+
+    const submitData = {
+      ...formData,
+      entity_type: selectedEntityType,
+      options: formData.field_type === 'dropdown' ? optionsInput.split(',').map(o => o.trim()).filter(o => o) : []
+    };
+
+    try {
+      if (editingField) {
+        await axios.patch(`${API_URL}/custom-fields/${editingField.id}`, submitData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        toast.success('Field updated');
+      } else {
+        await axios.post(`${API_URL}/custom-fields`, submitData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        toast.success('Field created');
+      }
+      resetForm();
+      fetchFields();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed');
+    }
+  };
+
+  const deleteField = async (fieldId) => {
+    if (!confirm('Delete this custom field?')) return;
+    try {
+      await axios.delete(`${API_URL}/custom-fields/${fieldId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Field deleted');
+      fetchFields();
+    } catch (error) {
+      toast.error('Failed to delete');
+    }
+  };
+
+  const toggleActive = async (field) => {
+    try {
+      await axios.patch(`${API_URL}/custom-fields/${field.id}`, { active: !field.active }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchFields();
+    } catch (error) {
+      toast.error('Failed to update');
+    }
+  };
+
+  const startEdit = (field) => {
+    setEditingField(field);
+    setFormData({
+      entity_type: field.entity_type,
+      label: field.label,
+      field_type: field.field_type,
+      required: field.required,
+      options: field.options || [],
+      order: field.order
+    });
+    setOptionsInput((field.options || []).join(', '));
+    setShowCreate(true);
+  };
+
+  const resetForm = () => {
+    setShowCreate(false);
+    setEditingField(null);
+    setFormData({ entity_type: selectedEntityType, label: '', field_type: 'text', required: false, options: [], order: 0 });
+    setOptionsInput('');
+  };
+
+  const moveField = async (field, direction) => {
+    const currentIndex = fields.findIndex(f => f.id === field.id);
+    if ((direction === 'up' && currentIndex === 0) || (direction === 'down' && currentIndex === fields.length - 1)) return;
+
+    const newFields = [...fields];
+    const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    [newFields[currentIndex], newFields[swapIndex]] = [newFields[swapIndex], newFields[currentIndex]];
+
+    const fieldOrders = newFields.map((f, i) => ({ id: f.id, order: i }));
+    try {
+      await axios.post(`${API_URL}/custom-fields/reorder`, fieldOrders, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchFields();
+    } catch (error) {
+      toast.error('Failed to reorder');
+    }
+  };
+
+  return (
+    <div className="space-y-6" data-testid="custom-fields-settings">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sliders size={20} />
+            Custom Fields
+          </CardTitle>
+          <CardDescription>Create custom fields to capture additional data for your entities</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Entity Type Tabs */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {entityTypes.map(type => {
+              const Icon = type.icon;
+              return (
+                <button
+                  key={type.id}
+                  onClick={() => setSelectedEntityType(type.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedEntityType === type.id ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Icon size={16} />
+                  {type.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Add Field Button */}
+          {isAdmin && !showCreate && (
+            <Button onClick={() => setShowCreate(true)} className="mb-4 bg-orange-500 hover:bg-orange-600">
+              <Plus size={16} className="mr-2" /> Add Custom Field
+            </Button>
+          )}
+
+          {/* Create/Edit Form */}
+          {showCreate && isAdmin && (
+            <Card className="mb-6 bg-gray-50">
+              <CardContent className="pt-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Label *</label>
+                      <Input
+                        value={formData.label}
+                        onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                        placeholder="Field label..."
+                        data-testid="field-label-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Field Type</label>
+                      <select
+                        value={formData.field_type}
+                        onChange={(e) => setFormData({ ...formData, field_type: e.target.value })}
+                        className="w-full border rounded-md p-2"
+                      >
+                        {fieldTypes.map(type => (
+                          <option key={type.id} value={type.id}>{type.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {formData.field_type === 'dropdown' && (
+                    <div>
+                      <label className="text-sm font-medium">Options (comma-separated)</label>
+                      <Input
+                        value={optionsInput}
+                        onChange={(e) => setOptionsInput(e.target.value)}
+                        placeholder="Option 1, Option 2, Option 3"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.required}
+                        onChange={(e) => setFormData({ ...formData, required: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm">Required field</span>
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
+                    <Button type="submit" className="bg-orange-500 hover:bg-orange-600">
+                      {editingField ? 'Update' : 'Create'} Field
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Fields List */}
+          {loading ? (
+            <div className="text-center py-8">Loading...</div>
+          ) : fields.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Sliders size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-500">No custom fields for {entityTypes.find(t => t.id === selectedEntityType)?.label}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {fields.map((field, index) => {
+                const FieldIcon = fieldTypes.find(t => t.id === field.field_type)?.icon || Type;
+                return (
+                  <div
+                    key={field.id}
+                    className={`flex items-center justify-between p-4 rounded-lg border ${field.active ? 'bg-white' : 'bg-gray-100 opacity-60'}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col gap-1">
+                        <button onClick={() => moveField(field, 'up')} disabled={index === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                          <ChevronUp size={14} />
+                        </button>
+                        <button onClick={() => moveField(field, 'down')} disabled={index === fields.length - 1} className="text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <FieldIcon size={20} className="text-gray-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{field.label}</p>
+                          {field.required && <Badge variant="outline" className="text-xs">Required</Badge>}
+                          {!field.active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {fieldTypes.find(t => t.id === field.field_type)?.label}
+                          {field.field_type === 'dropdown' && field.options?.length > 0 && ` (${field.options.length} options)`}
+                        </p>
+                      </div>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => toggleActive(field)}>
+                          {field.active ? <Eye size={16} /> : <Eye size={16} className="text-gray-400" />}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => startEdit(field)}>
+                          <Edit size={16} />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteField(field.id)}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 const OrganizationSettings = () => {
   const { token } = useAuth();
   const [org, setOrg] = useState(null);
