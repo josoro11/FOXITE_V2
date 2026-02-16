@@ -630,6 +630,14 @@ class EndUserCreate(BaseModel):
     phone: Optional[str] = None
     custom_fields_data: dict = {}
 
+class EndUserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    client_company_id: Optional[str] = None
+    status: Optional[str] = None
+    custom_fields_data: Optional[dict] = None
+
 # Client Company Models
 class ClientCompany(BaseModel):
     model_config = ConfigDict(extra="ignore")
