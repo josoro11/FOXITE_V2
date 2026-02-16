@@ -2948,6 +2948,196 @@ async def update_sla_policy(
     
     return updated_policy
 
+# ==================== CUSTOM FIELDS ROUTES ====================
+
+@api_router.get("/custom-fields")
+async def get_custom_fields(entity_type: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get custom fields for organization, optionally filtered by entity type"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {"organization_id": org_id}
+    if entity_type:
+        query["entity_type"] = entity_type
+    
+    fields = await db.custom_fields.find(query, {"_id": 0}).sort("order", 1).to_list(1000)
+    
+    for field in fields:
+        if isinstance(field.get('created_at'), str):
+            field['created_at'] = datetime.fromisoformat(field['created_at'])
+    
+    return fields
+
+@api_router.post("/custom-fields", response_model=CustomField)
+async def create_custom_field(field_data: CustomFieldCreate, current_user: dict = Depends(get_current_user)):
+    """Create a custom field (Admin only)"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admin/supervisor can manage custom fields")
+    
+    # Validate entity_type
+    valid_types = ['ticket', 'device', 'company', 'end_user', 'license', 'task']
+    if field_data.entity_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid entity_type. Must be one of: {valid_types}")
+    
+    # Validate field_type
+    valid_field_types = ['text', 'number', 'date', 'boolean', 'dropdown', 'file']
+    if field_data.field_type not in valid_field_types:
+        raise HTTPException(status_code=400, detail=f"Invalid field_type. Must be one of: {valid_field_types}")
+    
+    field = CustomField(
+        organization_id=org_id,
+        entity_type=field_data.entity_type,
+        label=field_data.label,
+        field_type=field_data.field_type,
+        required=field_data.required,
+        options=field_data.options,
+        order=field_data.order
+    )
+    
+    doc = field.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.custom_fields.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "CREATE", "custom_field", field.id)
+    
+    return field
+
+@api_router.patch("/custom-fields/{field_id}")
+async def update_custom_field(field_id: str, update_data: CustomFieldUpdate, current_user: dict = Depends(get_current_user)):
+    """Update a custom field"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admin/supervisor can manage custom fields")
+    
+    field = await db.custom_fields.find_one({"id": field_id, "organization_id": org_id}, {"_id": 0})
+    if not field:
+        raise HTTPException(status_code=404, detail="Custom field not found")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    
+    if update_dict:
+        await db.custom_fields.update_one({"id": field_id}, {"$set": update_dict})
+        await log_audit(org_id, current_user['id'], "UPDATE", "custom_field", field_id)
+    
+    updated = await db.custom_fields.find_one({"id": field_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/custom-fields/{field_id}")
+async def delete_custom_field(field_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a custom field"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admin/supervisor can manage custom fields")
+    
+    field = await db.custom_fields.find_one({"id": field_id, "organization_id": org_id}, {"_id": 0})
+    if not field:
+        raise HTTPException(status_code=404, detail="Custom field not found")
+    
+    await db.custom_fields.delete_one({"id": field_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "custom_field", field_id)
+    
+    return {"message": "Custom field deleted"}
+
+@api_router.post("/custom-fields/reorder")
+async def reorder_custom_fields(field_orders: List[dict], current_user: dict = Depends(get_current_user)):
+    """Reorder custom fields. Expects list of {id, order}"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admin/supervisor can manage custom fields")
+    
+    for item in field_orders:
+        if 'id' in item and 'order' in item:
+            await db.custom_fields.update_one(
+                {"id": item['id'], "organization_id": org_id},
+                {"$set": {"order": item['order']}}
+            )
+    
+    return {"message": "Fields reordered"}
+
+# ==================== ATTACHMENTS ROUTES ====================
+
+@api_router.get("/attachments")
+async def get_attachments(entity_type: str, entity_id: str, current_user: dict = Depends(get_current_user)):
+    """Get attachments for an entity"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    attachments = await db.attachments.find({
+        "organization_id": org_id,
+        "entity_type": entity_type,
+        "entity_id": entity_id
+    }, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    for att in attachments:
+        if isinstance(att.get('created_at'), str):
+            att['created_at'] = datetime.fromisoformat(att['created_at'])
+    
+    return attachments
+
+@api_router.post("/attachments", response_model=Attachment)
+async def create_attachment(attachment_data: AttachmentCreate, current_user: dict = Depends(get_current_user)):
+    """Create an attachment record"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Check if suspended
+    await enforce_not_suspended(org_id)
+    
+    attachment = Attachment(
+        organization_id=org_id,
+        entity_type=attachment_data.entity_type,
+        entity_id=attachment_data.entity_id,
+        file_name=attachment_data.file_name,
+        file_url=attachment_data.file_url,
+        file_size=attachment_data.file_size,
+        mime_type=attachment_data.mime_type,
+        uploaded_by=current_user['id']
+    )
+    
+    doc = attachment.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.attachments.insert_one(doc)
+    await log_audit(org_id, current_user['id'], "CREATE", "attachment", attachment.id)
+    
+    return attachment
+
+@api_router.delete("/attachments/{attachment_id}")
+async def delete_attachment(attachment_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an attachment"""
+    org_id = current_user.get('organization_id')
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    attachment = await db.attachments.find_one({"id": attachment_id, "organization_id": org_id}, {"_id": 0})
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    # Only uploader, admin, or supervisor can delete
+    if attachment['uploaded_by'] != current_user['id'] and current_user.get('role') not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    await db.attachments.delete_one({"id": attachment_id})
+    await log_audit(org_id, current_user['id'], "DELETE", "attachment", attachment_id)
+    
+    return {"message": "Attachment deleted"}
+
 # ==================== BUSINESS HOURS ROUTES ====================
 
 @api_router.post("/business-hours", response_model=BusinessHours)
