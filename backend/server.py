@@ -443,7 +443,10 @@ class Organization(BaseModel):
     timezone: str = "UTC"
     language: str = Language.EN
     plan: str = PlanType.CORE
+    billing_cycle: str = BillingCycle.MONTHLY
+    seat_count: int = 3  # Number of paid seats
     status: str = OrgStatus.ACTIVE
+    trial_ends_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class OrganizationCreate(BaseModel):
@@ -453,6 +456,8 @@ class OrganizationCreate(BaseModel):
     timezone: str = "UTC"
     language: str = Language.EN
     plan: str = PlanType.CORE
+    billing_cycle: str = BillingCycle.MONTHLY
+    seat_count: int = 3
 
 class OrganizationUpdate(BaseModel):
     name: Optional[str] = None
@@ -461,6 +466,8 @@ class OrganizationUpdate(BaseModel):
     timezone: Optional[str] = None
     language: Optional[str] = None
     plan: Optional[str] = None
+    billing_cycle: Optional[str] = None
+    seat_count: Optional[int] = None
     status: Optional[str] = None
 
 # Staff User Models
