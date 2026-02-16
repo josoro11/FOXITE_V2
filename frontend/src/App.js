@@ -3175,7 +3175,7 @@ const LicensesPage = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {licenses.map((l) => (
-            <Card key={l.id} className={`hover:shadow-md transition-shadow ${l.expired ? 'border-red-200' : l.expiring_soon ? 'border-yellow-200' : ''}`}>
+            <Card key={l.id} className={`hover:shadow-md transition-shadow cursor-pointer ${l.expired ? 'border-red-200' : l.expiring_soon ? 'border-yellow-200' : ''}`} onClick={() => navigate(`/licenses/${l.id}`)}>
               <CardContent className="py-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
@@ -3188,7 +3188,7 @@ const LicensesPage = () => {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge className={l.expired ? 'bg-red-100 text-red-700' : l.expiring_soon ? 'bg-yellow-100 text-yellow-700' : statusColors[l.status]}>{l.expired ? 'Expired' : l.expiring_soon ? 'Expiring Soon' : l.status}</Badge>
-                    {canEdit && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteLicense(l.id)}><Trash2 size={14} /></Button>}
+                    {canEdit && <Button variant="ghost" size="sm" className="text-red-600" onClick={e => { e.stopPropagation(); deleteLicense(l.id); }}><Trash2 size={14} /></Button>}
                   </div>
                 </div>
               </CardContent>
