@@ -2922,7 +2922,7 @@ const EndUsersPage = () => {
       await axios.post(`${API_URL}/end-users`, formData, { headers: { Authorization: `Bearer ${token}` } });
       toast.success('End user created');
       setShowCreate(false);
-      setFormData({ name: '', email: '', phone: '', client_company_id: '' });
+      setFormData({ name: '', email: '', phone: '', client_company_id: '', custom_fields_data: {} });
       fetchEndUsers();
     } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
   };
