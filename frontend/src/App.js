@@ -3017,7 +3017,7 @@ const DevicesPage = () => {
       await axios.post(`${API_URL}/devices`, formData, { headers: { Authorization: `Bearer ${token}` } });
       toast.success('Device created');
       setShowCreate(false);
-      setFormData({ name: '', device_type: 'desktop', status: 'active', serial_number: '', client_company_id: '' });
+      setFormData({ name: '', device_type: 'desktop', status: 'active', serial_number: '', client_company_id: '', custom_fields_data: {} });
       fetchDevices();
     } catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
   };
