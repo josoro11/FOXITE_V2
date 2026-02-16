@@ -308,6 +308,27 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - Orange glow shadows on CTAs (shadow-orange-500/25)
 - Clean, modern SaaS-grade aesthetic
 
+### Phase 4C: Admin Core Restoration (✅ Complete - Feb 16, 2026)
+**Re-enabled CRUD for Admin/Supervisor:**
+- Tasks: Full CRUD with priority/status, edit/delete functionality
+- End Users: Create with name, email, phone, company association
+- Companies: Create with domain, industry, phone, address fields
+- Licenses: Create with type, seats, expiration, company linkage
+- Devices: Create with type, status, serial number, company linkage
+- Saved Views: Create/delete with entity type and filter criteria
+
+**Time Tracking in Ticket Detail:**
+- Start/Stop timer functionality
+- Manual time entry with duration and notes
+- Session list showing all time entries per ticket
+- Total time display (hours:minutes)
+- Running session indicator
+
+**Role Protection Maintained:**
+- Admin/Supervisor: Full CRUD on all modules
+- Technician: Read-only access, can manage time on tickets
+- Settings page remains restricted to Admin/Supervisor
+
 ## Upcoming Tasks (Backlog)
 - UI polish and enhanced frontend refactoring
 - AI module integration (ticket summarization, categorization, suggested replies)
