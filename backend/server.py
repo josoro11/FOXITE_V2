@@ -848,11 +848,12 @@ class Device(BaseModel):
     purchase_date: Optional[datetime] = None
     warranty_expiry: Optional[datetime] = None
     notes: Optional[str] = None
+    custom_fields_data: dict = {}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class DeviceCreate(BaseModel):
-    client_company_id: str
+    client_company_id: Optional[str] = None
     name: str
     device_type: str
     manufacturer: Optional[str] = None
@@ -865,6 +866,7 @@ class DeviceCreate(BaseModel):
     purchase_date: Optional[datetime] = None
     warranty_expiry: Optional[datetime] = None
     notes: Optional[str] = None
+    custom_fields_data: dict = {}
 
 class DeviceUpdate(BaseModel):
     name: Optional[str] = None
@@ -879,19 +881,21 @@ class DeviceUpdate(BaseModel):
     purchase_date: Optional[datetime] = None
     warranty_expiry: Optional[datetime] = None
     notes: Optional[str] = None
+    custom_fields_data: Optional[dict] = None
 
 # License Models (Asset Inventory)
 class License(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     organization_id: str
-    client_company_id: str
+    client_company_id: Optional[str] = None
     name: str
     license_type: str  # software, service, subscription, other
     provider: Optional[str] = None
     license_key: Optional[str] = None
     assigned_to: Optional[str] = None  # end_user_id
     quantity: int = 1
+    seats_total: int = 1
     purchase_date: Optional[datetime] = None
     expiration_date: Optional[datetime] = None
     renewal_cost: Optional[float] = None
@@ -901,23 +905,26 @@ class License(BaseModel):
     expiring_soon: bool = False  # Calculated: < 60 days
     expired: bool = False  # Calculated: past expiration
     notes: Optional[str] = None
+    custom_fields_data: dict = {}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class LicenseCreate(BaseModel):
-    client_company_id: str
+    client_company_id: Optional[str] = None
     name: str
     license_type: str
     provider: Optional[str] = None
     license_key: Optional[str] = None
     assigned_to: Optional[str] = None
     quantity: int = 1
+    seats_total: int = 1
     purchase_date: Optional[datetime] = None
     expiration_date: Optional[datetime] = None
     renewal_cost: Optional[float] = None
     billing_cycle: Optional[str] = None
     status: str = "active"
     notes: Optional[str] = None
+    custom_fields_data: dict = {}
 
 class LicenseUpdate(BaseModel):
     name: Optional[str] = None
@@ -926,6 +933,7 @@ class LicenseUpdate(BaseModel):
     license_key: Optional[str] = None
     assigned_to: Optional[str] = None
     quantity: Optional[int] = None
+    seats_total: Optional[int] = None
     purchase_date: Optional[datetime] = None
     expiration_date: Optional[datetime] = None
     renewal_cost: Optional[float] = None
