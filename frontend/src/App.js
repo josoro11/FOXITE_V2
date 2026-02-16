@@ -2726,7 +2726,7 @@ const TasksPage = () => {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [formData, setFormData] = useState({ title: '', description: '', priority: 'medium', status: 'pending' });
+  const [formData, setFormData] = useState({ title: '', description: '', priority: 'medium', status: 'pending', custom_fields_data: {} });
 
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
 
