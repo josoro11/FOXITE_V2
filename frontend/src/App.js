@@ -3204,6 +3204,7 @@ const LicensesPage = () => {
 
 const CompaniesPage = () => {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
