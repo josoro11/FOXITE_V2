@@ -329,6 +329,42 @@ FOXITE is a multi-tenant B2B SaaS application similar to Freshservice, designed 
 - Technician: Read-only access, can manage time on tickets
 - Settings page remains restricted to Admin/Supervisor
 
+### Phase 5B: Per-Seat SaaS Commercial Model (✅ Complete - Feb 16, 2026)
+**Plan Pricing (Per-Seat Model):**
+- CORE: $18/user/month, min 3 users, 1 SLA, basic reports
+- PLUS: $55/user/month, min 3 users, 3 SLAs, full reports
+- PRIME: $100/user/month, no minimum, unlimited SLAs, full access
+- 15% yearly discount applied to all plans
+
+**Organization Model Updates:**
+- plan (CORE, PLUS, PRIME)
+- billing_cycle (monthly, yearly)
+- seat_count (number of paid seats)
+- status (active, suspended)
+- trial_ends_at (optional trial end date)
+
+**Seat Enforcement:**
+- Prevent creating users beyond seat_count
+- Validate minimum seats per plan
+- Allow seat adjustment with validation
+- API: PATCH /organization/seats
+
+**Plan Limits Enforcement:**
+- SLA limits enforced per plan (1/3/unlimited)
+- Feature gating based on plan tier
+- Suspension behavior: read-only access, no entity creation
+
+**Billing UI (Settings > Billing & Seats):**
+- Current plan details with pricing breakdown
+- Seat management (total/active/available)
+- Adjust seat count (Admin only)
+- SLA usage display
+
+**API Endpoints:**
+- GET /api/pricing/calculate - Calculate pricing for configuration
+- GET /api/organization/billing - Get billing info
+- PATCH /api/organization/seats - Update seat count
+
 ## Upcoming Tasks (Backlog)
 - UI polish and enhanced frontend refactoring
 - AI module integration (ticket summarization, categorization, suggested replies)
