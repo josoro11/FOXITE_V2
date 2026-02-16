@@ -2888,6 +2888,7 @@ const SessionsPage = () => {
 
 const EndUsersPage = () => {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [endUsers, setEndUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
