@@ -665,6 +665,7 @@ class Ticket(BaseModel):
     first_response_at: Optional[datetime] = None  # When first staff reply was made
     sla_breached_response: bool = False  # Response SLA breached
     sla_breached_resolution: bool = False  # Resolution SLA breached
+    custom_fields_data: dict = {}  # Dynamic custom fields storage
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -677,6 +678,7 @@ class TicketCreate(BaseModel):
     assigned_staff_id: Optional[str] = None
     client_company_id: Optional[str] = None
     device_id: Optional[str] = None
+    custom_fields_data: dict = {}
 
 class TicketUpdate(BaseModel):
     title: Optional[str] = None
@@ -684,6 +686,8 @@ class TicketUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     assigned_staff_id: Optional[str] = None
+    device_id: Optional[str] = None
+    custom_fields_data: Optional[dict] = None
 
 # Ticket Comment Models
 class TicketComment(BaseModel):
