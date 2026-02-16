@@ -2957,7 +2957,7 @@ const EndUsersPage = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {endUsers.map((eu) => (
-            <Card key={eu.id} className="hover:shadow-md transition-shadow">
+            <Card key={eu.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/end-users/${eu.id}`)}>
               <CardContent className="py-4">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
