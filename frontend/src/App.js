@@ -3212,7 +3212,7 @@ const CompaniesPage = () => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [formData, setFormData] = useState({ name: '', domain: '', industry: '', phone: '', address: '' });
+  const [formData, setFormData] = useState({ name: '', domain: '', industry: '', phone: '', address: '', custom_fields_data: {} });
 
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor';
 
