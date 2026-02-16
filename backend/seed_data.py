@@ -64,11 +64,14 @@ async def seed_database():
         "timezone": "America/New_York",
         "language": "en",
         "plan": "PLUS",
+        "billing_cycle": "monthly",
+        "seat_count": 5,
         "status": "active",
+        "trial_ends_at": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.organizations.insert_one(organization)
-    print(f"✓ Created Organization: TechPro MSP (PLUS plan)")
+    print(f"✓ Created Organization: TechPro MSP (PLUS plan, 5 seats)")
     
     # Create subscription for the organization
     subscription_id = str(uuid.uuid4())
