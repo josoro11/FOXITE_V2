@@ -972,6 +972,7 @@ const SettingsPage = () => {
 
   const settingsSections = [
     { id: 'organization', icon: Building2, label: 'Organization', path: '/settings/organization' },
+    { id: 'billing', icon: CreditCard, label: 'Billing & Seats', path: '/settings/billing' },
     { id: 'business-hours', icon: Clock, label: 'Business Hours', path: '/settings/business-hours' },
     { id: 'sla', icon: Shield, label: 'SLA Policies', path: '/settings/sla' },
     { id: 'notifications', icon: Bell, label: 'Notifications', path: '/settings/notifications', badge: 'Coming Soon' },
@@ -1020,6 +1021,7 @@ const SettingsPage = () => {
           <Routes>
             <Route path="/" element={<OrganizationSettings />} />
             <Route path="/organization" element={<OrganizationSettings />} />
+            <Route path="/billing" element={<BillingSettings />} />
             <Route path="/business-hours" element={<BusinessHoursSettings />} />
             <Route path="/sla" element={<SLASettings />} />
             <Route path="/notifications" element={<NotificationSettings />} />
@@ -1028,6 +1030,176 @@ const SettingsPage = () => {
           </Routes>
         </div>
       </div>
+    </div>
+  );
+};
+
+// ==================== BILLING SETTINGS ====================
+
+const BillingSettings = () => {
+  const { token, user } = useAuth();
+  const [billing, setBilling] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [newSeatCount, setNewSeatCount] = useState('');
+  const [updating, setUpdating] = useState(false);
+
+  const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    fetchBilling();
+  }, [token]);
+
+  const fetchBilling = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/organization/billing`, { headers: { Authorization: `Bearer ${token}` } });
+      setBilling(res.data);
+      setNewSeatCount(res.data.seats?.seat_count || 3);
+    } catch (error) {
+      toast.error('Failed to load billing info');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSeats = async () => {
+    const seats = parseInt(newSeatCount);
+    if (!seats || seats < 1) { toast.error('Invalid seat count'); return; }
+    setUpdating(true);
+    try {
+      await axios.patch(`${API_URL}/organization/seats?seat_count=${seats}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Seat count updated');
+      fetchBilling();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update seats');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (!billing) return <div>No billing info available</div>;
+
+  const { pricing, seats, sla_limits } = billing;
+
+  return (
+    <div className="space-y-6" data-testid="billing-settings">
+      {/* Current Plan */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard size={20} />
+            Current Plan
+          </CardTitle>
+          <CardDescription>Your subscription details and pricing</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500">Plan</label>
+                <p className="text-2xl font-bold text-gray-900">{pricing?.plan_name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Price per Seat</label>
+                <p className="text-lg font-semibold">${pricing?.price_per_seat}/user/month</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Billing Cycle</label>
+                <p className="text-lg">{pricing?.billing_cycle === 'yearly' ? 'Yearly (15% discount)' : 'Monthly'}</p>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold mb-3">Pricing Breakdown</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">{pricing?.seat_count} seats × ${pricing?.price_per_seat}</span>
+                  <span>${pricing?.monthly_subtotal}/mo</span>
+                </div>
+                {pricing?.billing_cycle === 'yearly' && pricing?.savings > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Yearly discount ({pricing?.yearly_discount_percent}%)</span>
+                    <span>-${(pricing?.savings / 12).toFixed(2)}/mo</span>
+                  </div>
+                )}
+                <div className="border-t pt-2 flex justify-between font-semibold text-lg">
+                  <span>Effective Monthly</span>
+                  <span>${pricing?.effective_monthly}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Seat Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users size={20} />
+            Seat Management
+          </CardTitle>
+          <CardDescription>Manage user seats for your organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-blue-600">{seats?.seat_count}</p>
+              <p className="text-sm text-gray-600">Total Seats</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-green-600">{seats?.current_users}</p>
+              <p className="text-sm text-gray-600">Active Users</p>
+            </div>
+            <div className="bg-orange-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-orange-600">{seats?.available_seats}</p>
+              <p className="text-sm text-gray-600">Available Seats</p>
+            </div>
+          </div>
+          
+          {isAdmin && (
+            <div className="border-t pt-4">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Adjust Seat Count</label>
+              <div className="flex gap-2 items-center">
+                <Input 
+                  type="number" 
+                  min={pricing?.min_seats || 1}
+                  value={newSeatCount} 
+                  onChange={(e) => setNewSeatCount(e.target.value)} 
+                  className="w-24"
+                  data-testid="seat-count-input"
+                />
+                <Button onClick={updateSeats} disabled={updating} className="bg-orange-500 hover:bg-orange-600" data-testid="update-seats-btn">
+                  {updating ? 'Updating...' : 'Update Seats'}
+                </Button>
+                <span className="text-sm text-gray-500">Min: {pricing?.min_seats} seats</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SLA Limits */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield size={20} />
+            Plan Limits
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <div className="bg-purple-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600">SLA Policies</p>
+              <p className="text-xl font-bold text-purple-600">
+                {sla_limits?.current_slas} / {sla_limits?.max_slas === null ? '∞' : sla_limits?.max_slas}
+              </p>
+            </div>
+            {!sla_limits?.can_add_sla && (
+              <Badge variant="outline" className="text-orange-600 border-orange-300">SLA limit reached - upgrade for more</Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
